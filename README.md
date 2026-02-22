@@ -25,7 +25,8 @@ A modern, production-ready FastAPI template utilizing a clean, layered (hexagona
 - **Linter & Formatter:** [Ruff](https://docs.astral.sh/ruff/)
 - **Testing:** `pytest` + `pytest-asyncio`
 - **Error Tracking:** Sentry SDK
-- **Package Manager:** `uv`
+- **ASGI Server:** [Uvicorn](https://www.uvicorn.org/)
+- **Package Manager:** [uv](https://docs.astral.sh/uv/)
 
 ## Project Structure
 
