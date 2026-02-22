@@ -40,7 +40,6 @@ async def register_service(
     return user
 
 
-
 async def authenticate(session: AsyncSession, email: str, password: str) -> Any:
     """
     Authenticate a user by email and password.
@@ -86,4 +85,3 @@ async def login_service(
         access_token=create_access_token(user.id),
         refresh_token=create_refresh_token(user.id),
     )
-

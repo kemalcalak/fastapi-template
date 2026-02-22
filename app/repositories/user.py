@@ -1,8 +1,8 @@
 import uuid
 from collections.abc import Sequence
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
 from app.utils import utc_now

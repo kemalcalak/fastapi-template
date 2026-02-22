@@ -1,20 +1,20 @@
 import uuid
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
+
+from app.models.user import User
+from app.models.user_activity import UserActivity
+from app.repositories.user_activity import create_user_activity
+from app.schemas.user_activity import (
+    ActivityStatus,
+    ActivityType,
+    ResourceType,
+    UserActivityCreate,
+)
 
 # Import the test session maker from conftest
 from app.tests.conftest import TestingSessionLocal
-from app.repositories.user_activity import create_user_activity
-from app.repositories.user import create_user
-from app.models.user import User
-from app.schemas.user_activity import (
-    UserActivityCreate,
-    ActivityType,
-    ResourceType,
-    ActivityStatus,
-)
-from app.models.user_activity import UserActivity
 
 
 @pytest.fixture
@@ -69,7 +69,10 @@ async def test_create_user_activity(db_session: AsyncSession):
 
     # 5. Make sure we can retrieve it from the database directly using SQLAlchemy (ORM)
     from sqlalchemy import select
-    result = await db_session.execute(select(UserActivity).where(UserActivity.id == activity.id))
+
+    result = await db_session.execute(
+        select(UserActivity).where(UserActivity.id == activity.id)
+    )
     db_record = result.scalars().first()
 
     assert db_record is not None

@@ -34,7 +34,7 @@ async def delete_own_account_service(
             detail=ErrorMessages.INVALID_PASSWORD,
         )
     await soft_delete_user(session, current_user)
-    
+
     await log_activity(
         session=session,
         user_id=current_user.id,
@@ -54,7 +54,7 @@ async def delete_user_service(
     """Admin-level soft delete for any user."""
     db_user = await get_user_service(session, user_id)
     await soft_delete_user(session, db_user)
-    
+
     await log_activity(
         session=session,
         user_id=current_user.id,
@@ -69,7 +69,10 @@ async def delete_user_service(
 
 
 async def create_user_service(
-    request: Request | None, session: AsyncSession, user_create: UserCreate, current_user: User | None = None
+    request: Request | None,
+    session: AsyncSession,
+    user_create: UserCreate,
+    current_user: User | None = None,
 ) -> User:
     """
     Business logic to create a new user.
@@ -85,14 +88,11 @@ async def create_user_service(
 
     # 2. Prepare user object
     user_data = user_create.model_dump(exclude={"password"})
-    db_obj = User(
-        **user_data,
-        hashed_password=get_password_hash(user_create.password)
-    )
+    db_obj = User(**user_data, hashed_password=get_password_hash(user_create.password))
 
     # 3. Call repository
     created_user = await create_user(session, db_obj)
-    
+
     if current_user and request:
         await log_activity(
             session=session,
@@ -103,7 +103,7 @@ async def create_user_service(
             details={"email": created_user.email},
             request=request,
         )
-        
+
     return created_user
 
 
@@ -127,7 +127,11 @@ async def list_users_service(
 
 
 async def update_user_service(
-    request: Request, session: AsyncSession, current_user: User, user_id: uuid.UUID, user_update: UserUpdate | UserUpdateMe
+    request: Request,
+    session: AsyncSession,
+    current_user: User,
+    user_id: uuid.UUID,
+    user_update: UserUpdate | UserUpdateMe,
 ) -> User:
     """Update user information including password hashing if provided."""
     db_user = await get_user_service(session, user_id)
@@ -149,15 +153,15 @@ async def update_user_service(
 
     # 3. Call repository
     updated_user = await update_user(session, db_user, update_dict)
-    
+
     await log_activity(
         session=session,
-        user_id=current_user.id, # Who is doing the update (admin or user themselves)
+        user_id=current_user.id,  # Who is doing the update (admin or user themselves)
         activity_type=ActivityType.UPDATE,
         resource_type=ResourceType.USER,
-        resource_id=updated_user.id, # Who is being updated
+        resource_id=updated_user.id,  # Who is being updated
         details={"updated_fields": list(update_dict.keys())},
         request=request,
     )
-    
+
     return updated_user

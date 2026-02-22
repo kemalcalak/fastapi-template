@@ -21,7 +21,10 @@ async def login_access_token(
     OAuth2 compatible token login, get an access token for future requests.
     """
     return await login_service(
-        request=request, session=session, email=form_data.username, password=form_data.password
+        request=request,
+        session=session,
+        email=form_data.username,
+        password=form_data.password,
     )
 
 
@@ -32,6 +35,4 @@ async def register_user(
     """
     Register a new user.
     """
-    return await register_service(
-        request=request, session=session, user_create=user_in
-    )
+    return await register_service(request=request, session=session, user_create=user_in)

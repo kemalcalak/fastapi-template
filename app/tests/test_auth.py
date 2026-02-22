@@ -1,6 +1,7 @@
 import pytest
 from httpx import AsyncClient
 
+
 @pytest.mark.asyncio
 async def test_register(client: AsyncClient):
     response = await client.post(
@@ -10,13 +11,14 @@ async def test_register(client: AsyncClient):
             "password": "password123",
             "first_name": "Test",
             "last_name": "User",
-            "title": "Tester"
-        }
+            "title": "Tester",
+        },
     )
     assert response.status_code == 200
     data = response.json()
     assert data["email"] == "test@test.com"
     assert "id" in data
+
 
 @pytest.mark.asyncio
 async def test_login(client: AsyncClient):
@@ -27,17 +29,13 @@ async def test_login(client: AsyncClient):
             "email": "test2@test.com",
             "password": "password123",
             "first_name": "Test2",
-            "last_name": "User2"
-        }
+            "last_name": "User2",
+        },
     )
-    
+
     # Now try to login using form data
     response = await client.post(
-        "/auth/login",
-        data={
-            "username": "test2@test.com",
-            "password": "password123"
-        }
+        "/auth/login", data={"username": "test2@test.com", "password": "password123"}
     )
     assert response.status_code == 200
     data = response.json()

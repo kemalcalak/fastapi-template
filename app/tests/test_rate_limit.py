@@ -2,16 +2,16 @@ import pytest
 from fastapi import APIRouter, Request
 from httpx import AsyncClient
 
+from app.core.config import settings
 from app.core.rate_limit import limiter, rate_limit_public
 from app.main import app
-from app.core.config import settings
 
 dummy_router = APIRouter()
 
 
 @dummy_router.get("/dummy-rate-limit", tags=["test"])
 @rate_limit_public("2/minute")
-async def dummy_rate_limit_endpoint(request: Request):
+async def dummy_rate_limit_endpoint(request: Request):  # noqa: ARG001
     return {"message": "success"}
 
 

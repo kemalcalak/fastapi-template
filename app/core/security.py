@@ -1,12 +1,11 @@
 import uuid
 from datetime import datetime, timedelta
 
-import jwt
 import bcrypt
+import jwt
 
 from app.core.config import settings
 from app.utils import utc_now
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -118,14 +117,11 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     try:
         if isinstance(hashed_password, str):
-            hashed_password_bytes = hashed_password.encode('utf-8')
+            hashed_password_bytes = hashed_password.encode("utf-8")
         else:
             hashed_password_bytes = hashed_password
-            
-        return bcrypt.checkpw(
-            plain_password.encode('utf-8'),
-            hashed_password_bytes
-        )
+
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password_bytes)
     except ValueError:
         return False
 
@@ -141,7 +137,7 @@ def get_password_hash(password: str) -> str:
         bcrypt hash string
     """
     salt = bcrypt.gensalt(prefix=b"2b")
-    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 
 # ---------------------------------------------------------------------------

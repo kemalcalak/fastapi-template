@@ -15,7 +15,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-from app.core.db import Base
+from app.core.db import Base  # noqa: E402
 
 # Import all models here so Alembic can detect them
 from app.models.user import User  # noqa
@@ -44,6 +44,7 @@ def run_migrations_offline() -> None:
 
     """
     from app.core.config import settings
+
     url = str(settings.SQLALCHEMY_DATABASE_URI)
     context.configure(
         url=url,

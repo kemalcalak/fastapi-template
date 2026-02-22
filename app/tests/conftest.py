@@ -1,12 +1,10 @@
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from app.core.db import Base
 
 from app import models  # noqa: F401
-
 from app.api.deps import get_db
+from app.core.db import Base
 from app.main import app
 
 # Use an in-memory SQLite database for testing
@@ -17,7 +15,9 @@ engine = create_async_engine(
     connect_args={"check_same_thread": False},
     pool_pre_ping=True,
 )
-TestingSessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine, expire_on_commit=False)
+TestingSessionLocal = async_sessionmaker(
+    autocommit=False, autoflush=False, bind=engine, expire_on_commit=False
+)
 
 
 async def override_get_db():
