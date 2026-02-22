@@ -1,8 +1,12 @@
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from pydantic import EmailStr
-from sqlmodel import Field, SQLModel
+
+if TYPE_CHECKING:
+    from app.models.user_activity import UserActivity
+from sqlmodel import Field, Relationship, SQLModel
 
 from app.utils import utc_now
 
@@ -25,3 +29,5 @@ class User(UserBase, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
     is_deleted: bool = Field(default=False, index=True)
     deleted_at: datetime | None = Field(default=None)
+
+    activities: list["UserActivity"] = Relationship(back_populates="user")
