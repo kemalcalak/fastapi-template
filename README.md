@@ -8,7 +8,7 @@ A modern, production-ready FastAPI template utilizing a clean, layered (hexagona
 - **Dependency Injection:** Fully utilizes FastAPI's dependency injection system.
 - **Asynchronous Database:** `SQLModel` with `asyncpg` for non-blocking database operations.
 - **Database Migrations:** Pre-configured `Alembic` for schema version control.
-- **Authentication & Security:** JWT validation and secure password hashing using `bcrypt` and `python-jose`.
+- **Authentication & Security:** JWT validation and secure password hashing using `bcrypt` and `pyjwt`.
 - **Environment Management:** Structured configuration via `pydantic-settings`.
 - **Package Management via `uv`:** Extremely fast dependency resolution and environment management.
 - **Testing:** Comprehensive test suite setup utilizing `pytest` and `pytest-asyncio`.
