@@ -27,4 +27,11 @@ jobs:
         run: uv sync
 
       - name: Run tests
+        env:
+          PROJECT_NAME: "FastAPI Template Test"
+          POSTGRES_SERVER: "localhost"
+          POSTGRES_USER: "postgres"
+          POSTGRES_PASSWORD: "changedsasadsadsadasddsathis"
+          FIRST_SUPERUSER: "admin@example.com"
+          FIRST_SUPERUSER_PASSWORD: "chanasdsadsdasaddsasdagethis"
         run: uv run pytest
