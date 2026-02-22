@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
 
 from app.core.messages.error_message import ErrorMessages
 
@@ -14,6 +14,8 @@ class SystemRole(str, Enum):
 
 # Shared properties
 class UserBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     email: EmailStr = Field(max_length=255)
     is_active: bool = True
     first_name: str | None = Field(default=None, max_length=100)

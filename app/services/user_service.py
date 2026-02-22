@@ -57,9 +57,9 @@ async def create_user_service(session: AsyncSession, user_create: UserCreate) ->
 
     # 2. Prepare user object
     user_data = user_create.model_dump(exclude={"password"})
-    db_obj = User.model_validate(
-        user_data,
-        update={"hashed_password": get_password_hash(user_create.password)},
+    db_obj = User(
+        **user_data,
+        hashed_password=get_password_hash(user_create.password)
     )
 
     # 3. Call repository
