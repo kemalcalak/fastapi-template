@@ -1,0 +1,55 @@
+[project]
+name = "fastapi-template"
+version = "0.1.0"
+description = "FastAPI template with layered architecture"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.18.4",
+    "asyncpg>=0.31.0",
+    "fastapi>=0.129.2",
+    "passlib[bcrypt]>=1.7.4",
+    "pydantic-settings>=2.13.1",
+    "pydantic[email]>=2.12.5",
+    "pyjwt>=2.11.0",
+    "python-jose[cryptography]>=3.5.0",
+    "sqlmodel>=0.0.37",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.2",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+    "ARG001", # unused-function-argument
+    "TID252", # relative-imports
+]
+ignore = [
+    "E501",  # line too long, handled by formatter
+    "B008",  # do not perform function calls in argument defaults (Found in FastAPI Depends)
+    "W191",  # indentation contains tabs
+    "B904",  # Allow raising exceptions without from e, for better ErrorMessages usage
+]
+
+[tool.ruff.lint.pyupgrade]
+# Preserve types, even if a the minimal python version supports a newer syntax.
+keep-runtime-typing = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

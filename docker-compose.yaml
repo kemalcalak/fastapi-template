@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:17
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+    volumes:
+      - app-db-data:/var/lib/postgresql/data/pgdata
+    env_file:
+      - .env
+    environment:
+      - PGDATA=/var/lib/postgresql/data/pgdata
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
+      - POSTGRES_USER=${POSTGRES_USER?Variable not set}
+      - POSTGRES_DB=${POSTGRES_DB?Variable not set}
+    ports:
+      - "5432:5432"
+
+
+
+  backend:
+    build:
+      context: .
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+    volumes:
+      - ./app:/app/app  # Mount source code for live reloading
+      - ./alembic.ini:/app/alembic.ini  # Mount alembic configuration
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
+      - SECRET_KEY=${SECRET_KEY?Variable not set}
+      - FIRST_SUPERUSER=${FIRST_SUPERUSER?Variable not set}
+      - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD?Variable not set}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - EMAILS_FROM_EMAIL=${EMAILS_FROM_EMAIL:-}
+      - POSTGRES_SERVER=${POSTGRES_SERVER:-}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER?Variable not set}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - AZURE_STORAGE_ACCOUNT_NAME=${AZURE_STORAGE_ACCOUNT_NAME:-}
+      - AZURE_STORAGE_ACCOUNT_KEY=${AZURE_STORAGE_ACCOUNT_KEY:-}
+      - AZURE_STORAGE_ENDPOINT_SUFFIX=${AZURE_STORAGE_ENDPOINT_SUFFIX:-}
+      - AZURE_BLOB_CONTAINER=${AZURE_BLOB_CONTAINER:-}
+      - AZURE_BLOB_PUBLIC_BASE_URL=${AZURE_BLOB_PUBLIC_BASE_URL:-}
+
+volumes:
+  app-db-data:
