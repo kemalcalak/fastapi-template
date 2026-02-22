@@ -1,8 +1,7 @@
 import uuid
-from typing import Any
 
 from fastapi import HTTPException, status
-from sqlmodel import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.messages.error_message import ErrorMessages
 from app.core.messages.success_message import SuccessMessages
@@ -16,12 +15,13 @@ from app.repositories.user import (
     soft_delete_user,
     update_user,
 )
+from app.schemas.msg import Message
 from app.schemas.user import UserCreate, UsersPublic, UserUpdate
 
 
-def delete_own_account_service(
-    session: Session, current_user: User, password: str
-) -> dict[str, Any]:
+async def delete_own_account_service(
+    session: AsyncSession, current_user: User, password: str
+) -> Message:
     """
     Securely delete own account with password confirmation.
     Uses soft delete.
@@ -31,24 +31,24 @@ def delete_own_account_service(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=ErrorMessages.INVALID_PASSWORD,
         )
-    soft_delete_user(session, current_user)
-    return {"success": True, "message": SuccessMessages.USER_DELETED}
+    await soft_delete_user(session, current_user)
+    return Message(success=True, message=SuccessMessages.USER_DELETED)
 
 
-def delete_user_service(session: Session, user_id: uuid.UUID) -> dict[str, Any]:
+async def delete_user_service(session: AsyncSession, user_id: uuid.UUID) -> Message:
     """Admin-level soft delete for any user."""
-    db_user = get_user_service(session, user_id)
-    soft_delete_user(session, db_user)
-    return {"success": True, "message": SuccessMessages.USER_DELETED}
+    db_user = await get_user_service(session, user_id)
+    await soft_delete_user(session, db_user)
+    return Message(success=True, message=SuccessMessages.USER_DELETED)
 
 
-def create_user_service(session: Session, user_create: UserCreate) -> User:
+async def create_user_service(session: AsyncSession, user_create: UserCreate) -> User:
     """
     Business logic to create a new user.
     Checks for email availability and hashes the password.
     """
     # 1. Guard check: Email must be unique
-    existing_user = get_user_by_email(session, email=user_create.email)
+    existing_user = await get_user_by_email(session, email=user_create.email)
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -63,12 +63,12 @@ def create_user_service(session: Session, user_create: UserCreate) -> User:
     )
 
     # 3. Call repository
-    return create_user(session, db_obj)
+    return await create_user(session, db_obj)
 
 
-def get_user_service(session: Session, user_id: uuid.UUID) -> User:
+async def get_user_service(session: AsyncSession, user_id: uuid.UUID) -> User:
     """Get a user by ID or raise 404."""
-    user = get_user_by_id(session, user_id)
+    user = await get_user_by_id(session, user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -77,23 +77,23 @@ def get_user_service(session: Session, user_id: uuid.UUID) -> User:
     return user
 
 
-def list_users_service(
-    session: Session, skip: int = 0, limit: int = 100
+async def list_users_service(
+    session: AsyncSession, skip: int = 0, limit: int = 100
 ) -> UsersPublic:
     """List users with pagination count."""
-    users, count = get_users_with_count(session, skip=skip, limit=limit)
+    users, count = await get_users_with_count(session, skip=skip, limit=limit)
     return UsersPublic(data=users, count=count)
 
 
-def update_user_service(
-    session: Session, user_id: uuid.UUID, user_update: UserUpdate
+async def update_user_service(
+    session: AsyncSession, user_id: uuid.UUID, user_update: UserUpdate
 ) -> User:
     """Update user information including password hashing if provided."""
-    db_user = get_user_service(session, user_id)
+    db_user = await get_user_service(session, user_id)
 
     # 1. Check email uniqueness if email is being updated
     if user_update.email and user_update.email != db_user.email:
-        existing_user = get_user_by_email(session, email=user_update.email)
+        existing_user = await get_user_by_email(session, email=user_update.email)
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -107,4 +107,4 @@ def update_user_service(
         update_dict["hashed_password"] = get_password_hash(password)
 
     # 3. Call repository
-    return update_user(session, db_user, update_dict)
+    return await update_user(session, db_user, update_dict)
