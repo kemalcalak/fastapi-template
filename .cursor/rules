@@ -1,0 +1,137 @@
+You are an expert in Python, FastAPI, SQLAlchemy 2.0 (async), Pydantic v2, Alembic, and scalable layered API architecture.
+
+Key Principles
+- Write concise, technical responses with accurate Python examples.
+- Use strict layered architecture: api → services → repositories → models. Never skip layers.
+- Use functional, declarative programming; avoid classes unless absolutely necessary.
+- Use async def for all I/O-bound operations. Use def only for pure utility functions or dependency factories with no I/O.
+- Use descriptive variable names with auxiliary verbs (e.g., is_active, has_permission, user_exists).
+- Use lowercase with underscores for all directories and files (e.g., repositories/user.py).
+- Always declare explicit response_model and status_code on every route.
+- Use the Receive an Object, Return an Object (RORO) pattern via Pydantic schemas.
+
+Project File Structure
+New domains always follow this exact path convention:
+- app/api/routes/<domain>.py
+- app/api/dependencies/<domain>.py
+- app/services/<domain>_service.py
+- app/repositories/<domain>.py
+- app/models/<domain>.py
+- app/schemas/<domain>.py
+
+Environment Variables
+The project uses these ENV variables (defined in .env, never hardcoded):
+- PROJECT_NAME — project display name
+- SECRET_KEY — JWT signing key
+- ENVIRONMENT — "local", "development", or "production"
+- POSTGRES_SERVER — PostgreSQL host
+- POSTGRES_USER — PostgreSQL user
+- POSTGRES_PASSWORD — PostgreSQL password
+- POSTGRES_DB — PostgreSQL database name
+- FIRST_SUPERUSER — initial admin email seeded on startup
+- FIRST_SUPERUSER_PASSWORD — initial admin password seeded on startup
+
+Dependency Injection Pattern
+Repositories and Services are pure async functions — not classes. Pass AsyncSession directly as a function argument. Use Depends() only in route handlers.
+
+  # repository — pure async function
+  async def get_user_by_id(session: AsyncSession, user_id: int) -> User | None:
+      result = await session.execute(select(User).where(User.id == user_id))
+      return result.scalar_one_or_none()
+
+  # service — pure async function, raises HTTPException directly
+  async def get_user_service(session: AsyncSession, user_id: int) -> UserResponse:
+      from app.core.messages.error_message import USER_NOT_FOUND
+      user = await get_user_by_id(session, user_id)
+      if not user:
+          raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
+      return UserResponse.model_validate(user)
+
+  # route handler — only layer that uses Depends()
+  @router.get("/{user_id}", response_model=UserResponse, status_code=200)
+  async def get_user(
+      user_id: int,
+      session: AsyncSession = Depends(get_session),
+  ) -> UserResponse:
+      return await get_user_service(session, user_id)
+
+Architecture — Layer Responsibilities
+- app/api/routes/: Route handlers only. No business logic. Uses Depends() for session and current_user.
+- app/api/dependencies/: Shared FastAPI dependencies (get_session, get_current_user, etc.).
+- app/services/: All business logic and orchestration. Receives session as argument. May raise HTTPException.
+- app/repositories/: All DB queries. No business rules. Receives session as argument.
+- app/models/: SQLAlchemy ORM definitions only. No methods, no logic.
+- app/schemas/: Pydantic DTOs. Separate Create, Update, and Response schemas per domain.
+- app/core/: Config (pydantic-settings), security (JWT + bcrypt), exceptions, logging.
+- app/utils/: Pure helper functions shared across layers.
+
+Cross-Domain Coordination
+- Services never call other services.
+- If cross-domain orchestration is needed, create a dedicated app/use_cases/<action>.py or resolve it by calling multiple repository functions within the same service.
+
+Exception Handling
+- HTTPException can be raised in both services and route handlers.
+- Use guard clauses at the top of service functions for validation and not-found checks.
+- Never expose internal errors or stack traces in API responses.
+- Register global exception handlers in app/main.py for unexpected errors.
+- Error messages must ALWAYS be retrieved from app/core/messages/error_message.py.
+- Success messages must ALWAYS be retrieved from app/core/messages/success_message.py.
+- Never hardcode error or success message strings.
+
+Python/FastAPI
+- Type hints are required on all function signatures.
+- Never return raw SQLAlchemy ORM objects from endpoints or services. Always map to Pydantic schemas.
+- Use lifespan context managers instead of deprecated @app.on_event("startup"/"shutdown").
+- Use middleware for logging, error monitoring, and rate limiting (slowapi).
+- Use uv for all package management. Never use pip install.
+- First superuser is seeded on startup using FIRST_SUPERUSER and FIRST_SUPERUSER_PASSWORD env vars.
+
+Database
+- Use AsyncSession from SQLAlchemy 2.0. Never use sync sessions.
+- For listing/reporting endpoints, prefer explicit columns in select() to avoid over-fetching.
+- For detail endpoints, selecting full entity is acceptable.
+- After every change to app/models/, generate and commit an Alembic migration.
+
+Error Handling Style
+- Handle errors at the beginning of functions using guard clauses and early returns.
+- Place the happy path last.
+- Avoid unnecessary else after return.
+
+  # DO
+  from app.core.messages.error_message import USER_NOT_FOUND
+
+  async def get_user_service(session: AsyncSession, user_id: int) -> UserResponse:
+      user = await get_user_by_id(session, user_id)
+      if not user:
+          raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
+      return UserResponse.model_validate(user)
+
+  # DON'T
+  async def get_user_service(session: AsyncSession, user_id: int) -> UserResponse:
+      user = await get_user_by_id(session, user_id)
+      if user:
+          return UserResponse.model_validate(user)
+      else:
+          raise HTTPException(status_code=404, detail="User not found.")  # never hardcode
+
+Testing
+- All tests live in app/tests/. Name files test_<domain>.py.
+- Use pytest and pytest-asyncio. Mark all async tests with @pytest.mark.asyncio.
+- Define shared fixtures (async client, test DB session) in conftest.py.
+- Test both success and error paths for every endpoint.
+
+Code Quality
+- Run before every commit: uv run ruff format . && uv run ruff check --fix .
+- No unused imports or variables. Import order managed by ruff.
+- All public functions must have type hints.
+
+Key Conventions
+1. No classes for repositories or services — use pure async functions.
+2. Depends() is used only in route handlers, never in service or repository functions.
+3. Repositories are the only layer that executes DB queries.
+4. Services contain all business logic and may raise HTTPException directly.
+5. ORM objects never leave the service layer — always map to Pydantic schemas before returning.
+6. Never call another service from a service. Use shared repository functions or use_cases/ instead.
+7. Never skip writing a migration after changing a model.
+
+Refer to FastAPI, SQLAlchemy 2.0, Pydantic v2, and Alembic documentation for best practices.
