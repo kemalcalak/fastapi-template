@@ -108,6 +108,7 @@ These are non-negotiable:
 - Always create an Alembic migration after changing a model
 - Always commit `uv.lock` together with dependency changes
 - Never use `pip install` — use `uv add` only
+- All functions must have a docstring — minimum one line, always in English
 
 ---
 
@@ -157,13 +158,14 @@ chore: update dependencies
 
 ---
 
-## AI Usage Rules (Claude / Cursor)
+## AI Usage Rules
 
 - Follow the layered architecture strictly — never bypass the service layer
 - Never generate classes for services or repositories — use pure async functions
 - Never place `Depends()` inside service or repository functions
 - Never generate sync DB code — always `async/await`
 - Never hardcode error/success message strings — always import from `core/messages/`
+- Always write a docstring for every function — minimum one line, in English
 - Never ignore Hard Rules above
 - Prefer small, incremental changes over large rewrites
 - Always include tests when adding new logic
