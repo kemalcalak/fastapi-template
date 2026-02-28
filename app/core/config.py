@@ -49,6 +49,15 @@ class Settings(BaseSettings):
     PROJECT_NAME: str
     SENTRY_DSN: str | None = None
 
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USE_STARTTLS: bool = True
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    EMAILS_FROM_EMAIL: str = "noreply@example.com"
+
+    REDIS_URL: str = "redis://localhost:6379/0"
+
     POSTGRES_SERVER: str
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str

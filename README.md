@@ -27,6 +27,7 @@ This template integrates the best-in-class Python ecosystem tools to provide a s
 - **Framework:** [FastAPI](https://fastapi.tiangolo.com/) for building APIs with Python 3.12+ based on standard Python type hints.
 - **Architecture:** Strict Layered Architecture separating routers, services, repositories, and models, fully utilizing FastAPI's dependency injection.
 - **Database & ORM:** [SQLAlchemy](https://www.sqlalchemy.org/) with `asyncpg` for non-blocking operations, and [Alembic](https://alembic.sqlalchemy.org/) for schema migrations.
+- **Caching:** [Redis](https://redis.io/) integration using `redis.asyncio` for robust, high-performance distributed caching (e.g. for disposable email validation).
 - **Validation & Config:** [Pydantic v2](https://docs.pydantic.dev/latest/) and `pydantic-settings` for robust data validation and environment management.
 - **Security & Auth:** Built-in JWT validation, `bcrypt` password hashing, and [Slowapi](https://slowapi.readthedocs.io/en/latest/) for rate limiting.
 - **Tooling:** [uv](https://docs.astral.sh/uv/) for blazing-fast package management, and [Ruff](https://docs.astral.sh/ruff/) for linting and formatting.
@@ -50,7 +51,7 @@ The repository structure supports standard Continuous Integration pipelines out-
 ### Prerequisites
 
 - Python >= 3.12
-- Docker & Docker Compose (for local database)
+- Docker & Docker Compose (for local database and Redis)
 - [`uv`](https://docs.astral.sh/uv/) package manager (recommended)
 
 ### 1. Clone the Repository
@@ -73,20 +74,35 @@ cp .env.example .env
 Your `.env` file should look like this, filled with your actual configuration:
 
 ```env
+# Application Settings
 PROJECT_NAME="FastAPI Template"
 SECRET_KEY="changethis"
 ENVIRONMENT="local"
+FIRST_SUPERUSER="admin@example.com"
+FIRST_SUPERUSER_PASSWORD="changethis"
+
+# Database Settings
 POSTGRES_SERVER="localhost"
+POSTGRES_PORT=5432
 POSTGRES_USER="postgres"
 POSTGRES_PASSWORD="changethis"
 POSTGRES_DB="app"
-FIRST_SUPERUSER="admin@example.com"
-FIRST_SUPERUSER_PASSWORD="changethis"
+
+# Redis Cache Settings
+REDIS_URL="redis://localhost:6379/0"
+
+# Email / SMTP Settings (Optional)
+SMTP_HOST="smtp.example.com"
+SMTP_PORT=587
+SMTP_USE_STARTTLS=True
+SMTP_USER="smtp_username"
+SMTP_PASSWORD="smtp_password"
+EMAILS_FROM_EMAIL="noreply@example.com"
 ```
 
 ### 3. Start the Application via Docker
 
-This project provides a `docker-compose.yaml` to spin up the entire stack, including the backend service and a local PostgreSQL instance:
+This project provides a `docker-compose.yaml` to spin up the entire stack, including the backend service, a local PostgreSQL instance, and a Redis container:
 
 ```bash
 docker-compose up -d --build
