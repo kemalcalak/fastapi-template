@@ -1,12 +1,12 @@
 from typing import Any
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.messages.error_message import ErrorMessages
 from app.schemas.msg import Message
 from app.schemas.user import DeleteAccount, UserPublic, UserUpdateMe
-from app.schemas.user_activity import ActivityType, ResourceType, ActivityStatus
+from app.schemas.user_activity import ActivityStatus, ActivityType, ResourceType
 from app.services.user_activity_service import log_activity
 from app.services.user_service import delete_own_account_service, update_user_service
 
@@ -14,7 +14,9 @@ router = APIRouter()
 
 
 @router.get("/me", response_model=UserPublic)
-async def read_user_me(request: Request, session: SessionDep, current_user: CurrentUser) -> Any:
+async def read_user_me(
+    request: Request, session: SessionDep, current_user: CurrentUser
+) -> Any:
     """
     Get current user.
     """

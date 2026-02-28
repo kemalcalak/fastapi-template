@@ -1,3 +1,4 @@
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -9,14 +10,14 @@ from app.core.messages.error_message import ErrorMessages
 from app.core.messages.success_message import SuccessMessages
 from app.schemas.token import LoginResponse, Token
 from app.schemas.user import UserCreate, UserPublic
-from app.schemas.user_activity import ActivityType, ResourceType, ActivityStatus
-from app.services.user_activity_service import log_activity
+from app.schemas.user_activity import ActivityStatus, ActivityType, ResourceType
 from app.services.auth_service import (
     login_service,
+    logout_service,
     refresh_token_service,
     register_service,
-    logout_service,
 )
+from app.services.user_activity_service import log_activity
 
 router = APIRouter()
 
@@ -90,14 +91,18 @@ async def refresh_token(
 
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
-async def logout(request: Request, response: Response, session: SessionDep) -> dict[str, str]:
+async def logout(
+    request: Request, response: Response, session: SessionDep
+) -> dict[str, str]:
     """
     Clear refresh token cookie and invalidate token in the blacklist.
     """
     refresh_token = request.cookies.get("refresh_token")
     try:
         if refresh_token:
-            await logout_service(request=request, session=session, refresh_token=refresh_token)
+            await logout_service(
+                request=request, session=session, refresh_token=refresh_token
+            )
 
         response.delete_cookie(
             key="refresh_token",
@@ -119,7 +124,9 @@ async def logout(request: Request, response: Response, session: SessionDep) -> d
         raise HTTPException(status_code=500, detail=ErrorMessages.INTERNAL_SERVER_ERROR)
 
 
-@router.post("/register", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register", response_model=UserPublic, status_code=status.HTTP_201_CREATED
+)
 async def register_user(
     request: Request, session: SessionDep, user_in: UserCreate
 ) -> UserPublic:
@@ -127,4 +134,3 @@ async def register_user(
     Register a new user.
     """
     return await register_service(request=request, session=session, user_create=user_in)
-

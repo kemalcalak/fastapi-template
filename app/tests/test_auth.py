@@ -62,7 +62,7 @@ async def test_refresh_token_and_logout(client: AsyncClient):
         "/auth/login", data={"username": "test3@test.com", "password": "password123"}
     )
     assert login_response.status_code == 200
-    
+
     # Extract refresh token cookie
     refresh_cookie = login_response.cookies.get("refresh_token")
     assert refresh_cookie is not None
@@ -76,7 +76,7 @@ async def test_refresh_token_and_logout(client: AsyncClient):
     # Test Logout Endpoint
     logout_response = await client.post("/auth/logout")
     assert logout_response.status_code == 200
-    
+
     # Refresh should now fail because token is blacklisted
     # Since cookies are cleared in logout, we need to explicitly set it back to the old one to test blacklist
     client.cookies.set("refresh_token", refresh_cookie)

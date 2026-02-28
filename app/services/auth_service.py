@@ -1,6 +1,5 @@
-
-
 import uuid
+
 from fastapi import HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,11 +11,14 @@ from app.core.security import (
     verify_refresh_token,
 )
 from app.models.user import User
+from app.repositories.token_blacklist import (
+    add_token_to_blacklist,
+    is_token_blacklisted,
+)
 from app.repositories.user import get_user_by_email, get_user_by_id
-from app.repositories.token_blacklist import is_token_blacklisted, add_token_to_blacklist
 from app.schemas.token import AuthTokens, Token
 from app.schemas.user import UserCreate, UserPublic
-from app.schemas.user_activity import ActivityType, ResourceType, ActivityStatus
+from app.schemas.user_activity import ActivityStatus, ActivityType, ResourceType
 from app.services.user_activity_service import log_activity
 from app.services.user_service import create_user_service
 
@@ -43,7 +45,9 @@ async def register_service(
     return UserPublic.model_validate(user)
 
 
-async def authenticate(request: Request | None, session: AsyncSession, email: str, password: str) -> User:
+async def authenticate(
+    request: Request | None, session: AsyncSession, email: str, password: str
+) -> User:
     """
     Authenticate a user by email and password.
     Returns the user object if successful, raises 401 otherwise.
@@ -99,7 +103,9 @@ async def login_service(
     Orchestrate the login process: authenticate user and generate JWT tokens.
     Simplified token creation relying on security component defaults.
     """
-    user = await authenticate(request=request, session=session, email=email, password=password)
+    user = await authenticate(
+        request=request, session=session, email=email, password=password
+    )
 
     await log_activity(
         session=session,
@@ -117,7 +123,9 @@ async def login_service(
     )
 
 
-async def refresh_token_service(request: Request | None, session: AsyncSession, refresh_token: str) -> Token:
+async def refresh_token_service(
+    request: Request | None, session: AsyncSession, refresh_token: str
+) -> Token:
     """
     Validate refresh token and return a new access token.
     Checks if token is blacklisted and the user is still active.
@@ -176,7 +184,9 @@ async def refresh_token_service(request: Request | None, session: AsyncSession, 
     return Token(access_token=create_access_token(user_id))
 
 
-async def logout_service(request: Request | None, session: AsyncSession, refresh_token: str | None) -> None:
+async def logout_service(
+    request: Request | None, session: AsyncSession, refresh_token: str | None
+) -> None:
     """
     Invalidates a refresh token by adding it to the blacklist.
     """
@@ -185,7 +195,7 @@ async def logout_service(request: Request | None, session: AsyncSession, refresh
         is_blacklisted = await is_token_blacklisted(session, refresh_token)
         if not is_blacklisted:
             await add_token_to_blacklist(session, refresh_token)
-        
+
         # Log success if possible
         user_id = verify_refresh_token(refresh_token)
         if user_id and request:

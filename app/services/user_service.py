@@ -17,7 +17,7 @@ from app.repositories.user import (
 )
 from app.schemas.msg import Message
 from app.schemas.user import UserCreate, UsersPublic, UserUpdate, UserUpdateMe
-from app.schemas.user_activity import ActivityType, ResourceType, ActivityStatus
+from app.schemas.user_activity import ActivityStatus, ActivityType, ResourceType
 from app.services.user_activity_service import log_activity
 
 

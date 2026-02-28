@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+
 from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -12,6 +13,7 @@ class TokenBlacklist(Base):
     Stores revoked JWT tokens (specifically refresh tokens, or their JTIs).
     Allows preventing usage of tokens after logout or password changes.
     """
+
     __tablename__ = "token_blacklist"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
