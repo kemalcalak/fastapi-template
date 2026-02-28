@@ -127,11 +127,13 @@ async def send_email(
         msg.set_content(plain_text)
 
     def _send_sync() -> None:
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15) as smtp:
-            smtp.ehlo()
-            if settings.SMTP_USE_STARTTLS:
-                # STARTTLS is strictly enforced. Will raise SMTPNotSupportedError if not supported by the server.
-                smtp.starttls()
+        smtp_class = smtplib.SMTP_SSL if settings.SMTP_USE_SSL else smtplib.SMTP
+        with smtp_class(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15) as smtp:
+            if not settings.SMTP_USE_SSL:
+                smtp.ehlo()
+                if settings.SMTP_USE_STARTTLS:
+                    # STARTTLS is strictly enforced. Will raise SMTPNotSupportedError if not supported by the server.
+                    smtp.starttls()
             if settings.SMTP_USER and settings.SMTP_PASSWORD:
                 smtp.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             smtp.send_message(msg, from_addr=envelope_from)

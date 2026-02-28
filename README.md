@@ -95,6 +95,7 @@ REDIS_URL="redis://localhost:6379/0"
 SMTP_HOST="smtp.example.com"
 SMTP_PORT=587
 SMTP_USE_STARTTLS=True
+SMTP_USE_SSL=False
 SMTP_USER="smtp_username"
 SMTP_PASSWORD="smtp_password"
 EMAILS_FROM_EMAIL="noreply@example.com"

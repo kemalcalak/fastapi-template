@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     SMTP_HOST: str | None = None
     SMTP_PORT: int = 587
     SMTP_USE_STARTTLS: bool = True
+    SMTP_USE_SSL: bool = False
     SMTP_USER: str | None = None
     SMTP_PASSWORD: str | None = None
     EMAILS_FROM_EMAIL: str = "noreply@example.com"
