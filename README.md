@@ -8,8 +8,9 @@ While FastAPI is incredibly fast and flexible, it doesn't enforce a specific pro
 
 - **Pre-Configured Tooling:** `uv`, `pytest`, `ruff`, and `alembic` are pre-integrated. No wrestling with environment setups.
 - **Scalable Architecture:** Extends beyond simple MVC. It isolates API routing, business logic (Services), and database interactions (Repositories) making the app highly testable and maintainable.
-- **Production-Ready Security:** JWT authentication, HttpOnly cookies for refresh tokens, token blacklisting, password hashing, and rate limiting are baked in.
-- **Docker First:** A `docker-compose.yaml` is ready to spin up your backend and PostgreSQL database instantly.
+- **Production-Ready Security & Observability:** JWT authentication, HttpOnly cookies for refresh tokens, token blacklisting, password hashing, and rate limiting are baked in. Out-of-the-box integration with Sentry for robust error monitoring.
+- **Consistent Responses:** Global exception handlers utilizing centralized success and error messages prevent hardcoded strings and standardize the API response structures.
+- **Docker First:** A `docker-compose.yaml` is ready to spin up your backend, PostgreSQL database, and Redis instances instantly.
 
 ---
 
@@ -26,10 +27,13 @@ This template integrates the best-in-class Python ecosystem tools to provide a s
 
 - **Framework:** [FastAPI](https://fastapi.tiangolo.com/) for building APIs with Python 3.12+ based on standard Python type hints.
 - **Architecture:** Strict Layered Architecture separating routers, services, repositories, and models, fully utilizing FastAPI's dependency injection.
-- **Database & ORM:** [SQLAlchemy](https://www.sqlalchemy.org/) with `asyncpg` for non-blocking operations, and [Alembic](https://alembic.sqlalchemy.org/) for schema migrations.
-- **Caching:** [Redis](https://redis.io/) integration using `redis.asyncio` for robust, high-performance distributed caching (e.g. for disposable email validation).
+- **Database & ORM:** [SQLAlchemy 2.0](https://www.sqlalchemy.org/) with `asyncpg` for non-blocking operations, and [Alembic](https://alembic.sqlalchemy.org/) for schema migrations.
+- **Observability & Error Tracking:** [Sentry](https://sentry.io/) built-in integration for tracking unhandled exceptions and performance tracing.
+- **Caching:** [Redis](https://redis.io/) integration using `redis.asyncio` for robust, high-performance distributed caching.
 - **Validation & Config:** [Pydantic v2](https://docs.pydantic.dev/latest/) and `pydantic-settings` for robust data validation and environment management.
-- **Security & Auth:** Built-in JWT validation, `bcrypt` password hashing, and [Slowapi](https://slowapi.readthedocs.io/en/latest/) for rate limiting.
+- **Security & Auth:** Built-in JWT validation, `bcrypt` password hashing, and [Slowapi](https://slowapi.readthedocs.io/en/latest/) for rate limiting and brute force protection.
+- **Smart Email Validation & Delivery:** Built-in asynchronous email sending with SMTP, domain MX record checking using `dnspython`, and auto-updating disposable email provider filtering via Redis cache.
+- **Standardized API Responses:** Global exception handlers standardizing success/error schemas, utilizing a centralized `messages` module (`app/core/messages/`) to prevent hardcoded responses.
 - **Tooling:** [uv](https://docs.astral.sh/uv/) for blazing-fast package management, and [Ruff](https://docs.astral.sh/ruff/) for linting and formatting.
 - **Testing:** Comprehensive async testing setup with `pytest` and `pytest-asyncio`.
 
@@ -94,7 +98,7 @@ REDIS_URL="redis://localhost:6379/0"
 
 # Email / SMTP Settings (Optional)
 SMTP_HOST="smtp.example.com"
-SMTP_PORT=587
+SMTP_PORT=465
 SMTP_USE_STARTTLS=True
 SMTP_USE_SSL=False
 SMTP_USER="smtp_username"
@@ -167,7 +171,7 @@ This project uses [Ruff](https://docs.astral.sh/ruff/) for both code linting and
 │   ├── utils/            # Helper functions and shared utilities
 │   └── main.py           # Application entry point
 ├── alembic.ini           # Alembic settings
-├── docker-compose.yaml   # Docker compose configuration (e.g., PostgreSQL DB)
+├── docker-compose.yaml   # Docker compose configuration (DB & Redis)
 ├── Dockerfile            # Dockerfile for backend container
 ├── pyproject.toml        # Project dependencies and tool configurations
 ├── pytest.ini            # Pytest settings
