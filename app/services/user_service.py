@@ -16,7 +16,13 @@ from app.repositories.user import (
     update_user,
 )
 from app.schemas.msg import Message
-from app.schemas.user import UserCreate, UsersPublic, UserUpdate, UserUpdateMe
+from app.schemas.user import (
+    UserCreate,
+    UserPublic,
+    UsersPublic,
+    UserUpdate,
+    UserUpdateMe,
+)
 from app.schemas.user_activity import ActivityStatus, ActivityType, ResourceType
 from app.services.user_activity_service import log_activity
 
@@ -151,7 +157,7 @@ async def update_user_service(
     current_user: User,
     user_id: uuid.UUID,
     user_update: UserUpdate | UserUpdateMe,
-) -> User:
+) -> UserPublic:
     """Update user information including password hashing if provided."""
     db_user = await get_user_service(session, user_id)
 
@@ -192,4 +198,4 @@ async def update_user_service(
         request=request,
     )
 
-    return updated_user
+    return UserPublic.model_validate(updated_user)

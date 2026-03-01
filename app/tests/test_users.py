@@ -1,6 +1,8 @@
 import pytest
 from httpx import AsyncClient
 
+from app.core.messages.success_message import SuccessMessages
+
 
 @pytest.fixture
 async def auth_client(client: AsyncClient) -> AsyncClient:
@@ -73,9 +75,10 @@ async def test_update_user_me(auth_client: AsyncClient):
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["first_name"] == "Updated"
-    assert data["last_name"] == "Name"
-    assert data["title"] == "Senior Tester"
+    assert data["message"] == SuccessMessages.USER_UPDATED
+    assert data["user"]["first_name"] == "Updated"
+    assert data["user"]["last_name"] == "Name"
+    assert data["user"]["title"] == "Senior Tester"
 
     # Verify updates persisted
     response = await auth_client.get("/users/me")

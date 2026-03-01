@@ -66,6 +66,7 @@ async def login_access_token(
         return LoginResponse(
             access_token=result.access_token,
             user=result.user,
+            message=result.message,
         )
     except HTTPException:
         raise

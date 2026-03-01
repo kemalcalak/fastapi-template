@@ -160,6 +160,7 @@ async def login_service(
         access_token=create_access_token(user.id),
         refresh_token=create_refresh_token(user.id),
         user=UserPublic.model_validate(user),
+        message=SuccessMessages.LOGIN_SUCCESS,
     )
 
 
@@ -221,7 +222,9 @@ async def refresh_token_service(
             detail=ErrorMessages.USER_INACTIVE,
         )
 
-    return Token(access_token=create_access_token(user_id))
+    return Token(
+        access_token=create_access_token(user_id), message=SuccessMessages.LOGIN_SUCCESS
+    )
 
 
 async def logout_service(

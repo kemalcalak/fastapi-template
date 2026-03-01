@@ -2,8 +2,14 @@ from fastapi import APIRouter, HTTPException, Request
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.messages.error_message import ErrorMessages
+from app.core.messages.success_message import SuccessMessages
 from app.schemas.msg import Message
-from app.schemas.user import DeleteAccount, UserPublic, UserUpdateMe
+from app.schemas.user import (
+    DeleteAccount,
+    UserPublic,
+    UserUpdateMe,
+    UserUpdateResponse,
+)
 from app.schemas.user_activity import ActivityStatus, ActivityType, ResourceType
 from app.services.user_activity_service import log_activity
 from app.services.user_service import delete_own_account_service, update_user_service
@@ -34,23 +40,26 @@ async def read_user_me(
         raise HTTPException(status_code=500, detail=ErrorMessages.INTERNAL_SERVER_ERROR)
 
 
-@router.patch("/me", response_model=UserPublic)
+@router.patch("/me", response_model=UserUpdateResponse)
 async def update_user_me(
     request: Request,
     session: SessionDep,
     current_user: CurrentUser,
     user_in: UserUpdateMe,
-) -> UserPublic:
+) -> UserUpdateResponse:
     """
     Update own user details.
     """
     try:
-        return await update_user_service(
+        updated_user = await update_user_service(
             request=request,
             session=session,
             current_user=current_user,
             user_id=current_user.id,
             user_update=user_in,
+        )
+        return UserUpdateResponse(
+            user=updated_user, message=SuccessMessages.USER_UPDATED
         )
     except HTTPException:
         raise

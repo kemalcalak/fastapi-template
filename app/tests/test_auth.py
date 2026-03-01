@@ -85,7 +85,9 @@ async def test_refresh_token_and_logout(client: AsyncClient):
     client.cookies.set("refresh_token", refresh_cookie)
     refresh_response = await client.post("/auth/refresh")
     assert refresh_response.status_code == 200
-    assert "access_token" in refresh_response.json()
+    data = refresh_response.json()
+    assert "access_token" in data
+    assert data["message"] == SuccessMessages.LOGIN_SUCCESS
 
     # Test Logout Endpoint
     logout_response = await client.post("/auth/logout")
@@ -146,7 +148,9 @@ async def test_verify_email_flow(client: AsyncClient):
         "/auth/login", data={"username": email, "password": "password123"}
     )
     assert login_response.status_code == 200
-    assert "access_token" in login_response.json()
+    data = login_response.json()
+    assert "access_token" in data
+    assert data["message"] == SuccessMessages.LOGIN_SUCCESS
 
 
 @pytest.mark.asyncio

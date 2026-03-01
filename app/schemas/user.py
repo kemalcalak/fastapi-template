@@ -90,6 +90,11 @@ class UserPublic(UserBase):
     updated_at: datetime
 
 
+class UserUpdateResponse(BaseModel):
+    user: UserPublic
+    message: str
+
+
 class UsersPublic(BaseModel):
     data: list[UserPublic]
     count: int

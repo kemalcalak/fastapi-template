@@ -7,6 +7,7 @@ from app.schemas.user import UserPublic
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    message: str | None = None
 
 
 class LoginResponse(Token):
@@ -16,6 +17,7 @@ class LoginResponse(Token):
 class AuthTokens(Token):
     refresh_token: str
     user: UserPublic
+    message: str | None = None
 
 
 # Contents of JWT token
