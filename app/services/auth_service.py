@@ -26,7 +26,7 @@ from app.repositories.token_blacklist import (
 from app.repositories.user import get_user_by_email, get_user_by_id, update_user
 from app.schemas.msg import Message
 from app.schemas.token import AuthTokens, Token
-from app.schemas.user import Language, UserCreate, UserPublic
+from app.schemas.user import Language, UpdatePassword, UserCreate, UserPublic
 from app.schemas.user_activity import ActivityStatus, ActivityType, ResourceType
 from app.services.user_activity_service import log_activity
 from app.services.user_service import create_user_service
@@ -419,3 +419,44 @@ async def resend_verification_service(
     )
 
     return Message(success=True, message=SuccessMessages.VERIFICATION_EMAIL_SENT)
+
+
+async def change_password_service(
+    request: Request,
+    session: AsyncSession,
+    current_user: User,
+    update_password: UpdatePassword,
+) -> Message:
+    """
+    Change user password after verifying current password.
+    """
+    if not verify_password(
+        update_password.current_password, current_user.hashed_password
+    ):
+        await log_activity(
+            session=session,
+            user_id=current_user.id,
+            activity_type=ActivityType.UPDATE,
+            resource_type=ResourceType.AUTH,
+            status=ActivityStatus.FAILURE,
+            details={"reason": "invalid_current_password"},
+            request=request,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ErrorMessages.INVALID_CURRENT_PASSWORD,
+        )
+
+    hashed_password = get_password_hash(update_password.new_password)
+    await update_user(session, current_user, {"hashed_password": hashed_password})
+
+    await log_activity(
+        session=session,
+        user_id=current_user.id,
+        activity_type=ActivityType.UPDATE,
+        resource_type=ResourceType.AUTH,
+        details={"action": "password_changed"},
+        request=request,
+    )
+
+    return Message(success=True, message=SuccessMessages.PASSWORD_CHANGE_SUCCESS)

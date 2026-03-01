@@ -35,3 +35,6 @@ jobs:
           FIRST_SUPERUSER: ${{ secrets.FIRST_SUPERUSER || 'admin@example.com' }}
           FIRST_SUPERUSER_PASSWORD: ${{ secrets.FIRST_SUPERUSER_PASSWORD || 'testpassword' }}
         run: uv run pytest
+
+      - name: Run Ruff
+        run: uv run ruff check

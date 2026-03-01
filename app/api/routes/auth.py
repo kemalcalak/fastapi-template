@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 
-from app.api.deps import SessionDep
+from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
 from app.core.messages.error_message import ErrorMessages
 from app.core.messages.success_message import SuccessMessages
@@ -13,11 +13,13 @@ from app.schemas.token import LoginResponse, Token
 from app.schemas.user import (
     ForgotPassword,
     NewPassword,
+    UpdatePassword,
     UserCreate,
     VerifyEmail,
 )
 from app.schemas.user_activity import ActivityStatus, ActivityType, ResourceType
 from app.services.auth_service import (
+    change_password_service,
     login_service,
     logout_service,
     recover_password_service,
@@ -275,6 +277,40 @@ async def resend_verification(
             resource_type=ResourceType.USER,
             status=ActivityStatus.FAILURE,
             details={"error": str(e), "endpoint": "/resend-verification"},
+            request=request,
+        )
+        raise HTTPException(status_code=500, detail=ErrorMessages.INTERNAL_SERVER_ERROR)
+
+
+@router.patch(
+    "/change-password", response_model=Message, status_code=status.HTTP_200_OK
+)
+async def change_password(
+    request: Request,
+    session: SessionDep,
+    current_user: CurrentUser,
+    body: UpdatePassword,
+) -> Message:
+    """
+    Change user password while logged in.
+    """
+    try:
+        return await change_password_service(
+            request=request,
+            session=session,
+            current_user=current_user,
+            update_password=body,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        await log_activity(
+            session=session,
+            user_id=current_user.id,
+            activity_type=ActivityType.UPDATE,
+            resource_type=ResourceType.AUTH,
+            status=ActivityStatus.FAILURE,
+            details={"error": str(e), "endpoint": "/change-password"},
             request=request,
         )
         raise HTTPException(status_code=500, detail=ErrorMessages.INTERNAL_SERVER_ERROR)

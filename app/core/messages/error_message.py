@@ -18,3 +18,4 @@ class ErrorMessages:
     EMAIL_NOT_VERIFIED = "error.user.email_not_verified"
     INVALID_VERIFICATION_TOKEN = "error.user.invalid_verification_token"
     REFRESH_TOKEN_MISSING = "error.auth.refresh_token_missing"
+    INVALID_CURRENT_PASSWORD = "error.auth.invalid_current_password"

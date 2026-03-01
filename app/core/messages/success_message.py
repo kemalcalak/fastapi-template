@@ -10,5 +10,6 @@ class SuccessMessages:
     LOGIN_SUCCESS = "success.auth.login"
     PASSWORD_RESET_SENT = "success.auth.password_reset_sent"
     PASSWORD_RESET_SUCCESS = "success.auth.password_reset_success"
+    PASSWORD_CHANGE_SUCCESS = "success.auth.password_change_success"
     LOGOUT_SUCCESS = "success.auth.logout_success"
     REGISTER_SUCCESS = "success.auth.register_success"
