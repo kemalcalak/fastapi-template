@@ -86,7 +86,7 @@ async def test_refresh_token_and_logout(client: AsyncClient):
     refresh_response = await client.post("/auth/refresh")
     assert refresh_response.status_code == 200
     data = refresh_response.json()
-    assert "access_token" in data
+    assert refresh_response.cookies.get("access_token") is not None
     assert data["message"] == SuccessMessages.LOGIN_SUCCESS
 
     # Test Logout Endpoint
@@ -149,7 +149,7 @@ async def test_verify_email_flow(client: AsyncClient):
     )
     assert login_response.status_code == 200
     data = login_response.json()
-    assert "access_token" in data
+    assert login_response.cookies.get("access_token") is not None
     assert data["message"] == SuccessMessages.LOGIN_SUCCESS
 
 
@@ -282,19 +282,17 @@ async def test_change_password(client: AsyncClient):
         )
         await session.commit()
 
-    # 3. Login to get access token
+    # 3. Login to get access token cookie
     login_response = await client.post(
         "/auth/login", data={"username": email, "password": old_password}
     )
     assert login_response.status_code == 200
-    access_token = login_response.json()["access_token"]
-    headers = {"Authorization": f"Bearer {access_token}"}
+    assert login_response.cookies.get("access_token") is not None
 
     # 4. Test Change Password - Failure (Wrong current password)
     fail_response = await client.patch(
         "/auth/change-password",
         json={"current_password": "wrongpassword", "new_password": "newPassword456"},
-        headers=headers,
     )
     assert fail_response.status_code == 400
     assert fail_response.json()["error"] == ErrorMessages.INVALID_CURRENT_PASSWORD
@@ -303,7 +301,6 @@ async def test_change_password(client: AsyncClient):
     success_response = await client.patch(
         "/auth/change-password",
         json={"current_password": old_password, "new_password": new_password},
-        headers=headers,
     )
     assert success_response.status_code == 200
     assert success_response.json()["success"] is True
@@ -314,7 +311,7 @@ async def test_change_password(client: AsyncClient):
         "/auth/login", data={"username": email, "password": new_password}
     )
     assert new_login_response.status_code == 200
-    assert "access_token" in new_login_response.json()
+    assert new_login_response.cookies.get("access_token") is not None
 
     # 7. Verify Login fails with OLD password
     old_login_response = await client.post(

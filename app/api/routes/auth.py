@@ -9,7 +9,10 @@ from app.core.config import settings
 from app.core.messages.error_message import ErrorMessages
 from app.core.messages.success_message import SuccessMessages
 from app.schemas.msg import Message
-from app.schemas.token import LoginResponse, Token
+from app.schemas.token import (
+    CookieLoginResponse,
+    CookieRefreshResponse,
+)
 from app.schemas.user import (
     ForgotPassword,
     NewPassword,
@@ -34,13 +37,15 @@ from app.services.user_activity_service import log_activity
 router = APIRouter()
 
 
-@router.post("/login", response_model=LoginResponse, status_code=status.HTTP_200_OK)
+@router.post(
+    "/login", response_model=CookieLoginResponse, status_code=status.HTTP_200_OK
+)
 async def login_access_token(
     response: Response,
     request: Request,
     session: SessionDep,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-) -> LoginResponse:
+) -> CookieLoginResponse:
     """
     OAuth2 compatible token login, get an access token for future requests.
     """
@@ -50,6 +55,17 @@ async def login_access_token(
             session=session,
             email=form_data.username,
             password=form_data.password,
+        )
+
+        # Set access token in HttpOnly cookie
+        response.set_cookie(
+            key="access_token",
+            value=result.access_token,
+            httponly=True,
+            secure=settings.ENVIRONMENT != "local",
+            samesite="lax",
+            max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            path="/",
         )
 
         # Set refresh token in HttpOnly cookie
@@ -63,8 +79,7 @@ async def login_access_token(
             path=f"{settings.API_V1_STR}/auth/refresh",
         )
 
-        return LoginResponse(
-            access_token=result.access_token,
+        return CookieLoginResponse(
             user=result.user,
             message=result.message,
         )
@@ -83,11 +98,14 @@ async def login_access_token(
         raise HTTPException(status_code=500, detail=ErrorMessages.INTERNAL_SERVER_ERROR)
 
 
-@router.post("/refresh", response_model=Token, status_code=status.HTTP_200_OK)
+@router.post(
+    "/refresh", response_model=CookieRefreshResponse, status_code=status.HTTP_200_OK
+)
 async def refresh_token(
     request: Request,
+    response: Response,
     session: SessionDep,
-) -> Token:
+) -> CookieRefreshResponse:
     """
     Refresh access token using the refresh token from cookie.
     """
@@ -99,9 +117,22 @@ async def refresh_token(
         )
 
     try:
-        return await refresh_token_service(
+        result = await refresh_token_service(
             request=request, session=session, refresh_token=refresh_token_cookie
         )
+
+        # Set new access token in HttpOnly cookie
+        response.set_cookie(
+            key="access_token",
+            value=result.access_token,
+            httponly=True,
+            secure=settings.ENVIRONMENT != "local",
+            samesite="lax",
+            max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            path="/",
+        )
+
+        return CookieRefreshResponse(message=result.message)
     except HTTPException:
         raise
     except Exception as e:
@@ -129,6 +160,7 @@ async def logout(request: Request, response: Response, session: SessionDep) -> M
                 request=request, session=session, refresh_token=refresh_token
             )
 
+        response.delete_cookie(key="access_token", path="/")
         response.delete_cookie(
             key="refresh_token",
             path=f"{settings.API_V1_STR}/auth/refresh",

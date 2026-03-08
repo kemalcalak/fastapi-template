@@ -35,7 +35,7 @@ async def auth_client(client: AsyncClient) -> AsyncClient:
         )
         await session.commit()
 
-    # Login and get token
+    # Login — access_token is set as HttpOnly cookie; httpx stores and forwards it automatically
     response = await client.post(
         "/auth/login",
         data={
@@ -43,11 +43,8 @@ async def auth_client(client: AsyncClient) -> AsyncClient:
             "password": "password123",
         },
     )
-    data = response.json()
-    token = data["access_token"]
-
-    # Set auth header
-    client.headers["Authorization"] = f"Bearer {token}"
+    assert response.status_code == 200
+    assert response.cookies.get("access_token") is not None
     return client
 
 
