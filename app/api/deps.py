@@ -2,7 +2,7 @@ import uuid
 from collections.abc import AsyncGenerator
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +17,10 @@ from app.repositories.user import get_user_by_id
 from app.schemas.token import TokenPayload
 from app.schemas.user import SystemRole
 
-reusable_oauth2 = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+# auto_error=False: cookie tabanlı auth kullanıldığında Bearer token isteğe bağlıdır
+reusable_oauth2 = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False
+)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -27,12 +30,22 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def get_current_user(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
-    token: Annotated[str, Depends(reusable_oauth2)],
+    bearer_token: Annotated[str | None, Depends(reusable_oauth2)] = None,
 ) -> User:
     """
     Get current authenticated user from JWT token.
+    Cookie takes priority; falls back to Authorization Bearer header.
     """
+    token = request.cookies.get("access_token") or bearer_token
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=ErrorMessages.INVALID_TOKEN,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     try:
         # Check if token is blacklisted
         if await is_token_blacklisted(db, token):

@@ -52,6 +52,17 @@ async def login_access_token(
             password=form_data.password,
         )
 
+        # Set access token in HttpOnly cookie
+        response.set_cookie(
+            key="access_token",
+            value=result.access_token,
+            httponly=True,
+            secure=settings.ENVIRONMENT != "local",
+            samesite="lax",
+            max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            path="/",
+        )
+
         # Set refresh token in HttpOnly cookie
         response.set_cookie(
             key="refresh_token",
@@ -86,6 +97,7 @@ async def login_access_token(
 @router.post("/refresh", response_model=Token, status_code=status.HTTP_200_OK)
 async def refresh_token(
     request: Request,
+    response: Response,
     session: SessionDep,
 ) -> Token:
     """
@@ -99,9 +111,22 @@ async def refresh_token(
         )
 
     try:
-        return await refresh_token_service(
+        result = await refresh_token_service(
             request=request, session=session, refresh_token=refresh_token_cookie
         )
+
+        # Set new access token in HttpOnly cookie
+        response.set_cookie(
+            key="access_token",
+            value=result.access_token,
+            httponly=True,
+            secure=settings.ENVIRONMENT != "local",
+            samesite="lax",
+            max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            path="/",
+        )
+
+        return result
     except HTTPException:
         raise
     except Exception as e:
@@ -129,6 +154,7 @@ async def logout(request: Request, response: Response, session: SessionDep) -> M
                 request=request, session=session, refresh_token=refresh_token
             )
 
+        response.delete_cookie(key="access_token", path="/")
         response.delete_cookie(
             key="refresh_token",
             path=f"{settings.API_V1_STR}/auth/refresh",
