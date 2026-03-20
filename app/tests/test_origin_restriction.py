@@ -73,7 +73,7 @@ async def test_same_origin_put(client: AsyncClient):
 async def test_cross_origin_post_blocked(client: AsyncClient):
     """Test that cross-origin POST requests are still blocked (404)."""
     response = await client.post(
-        "/api/v1/auth/logout",
+        "/auth/logout",
         headers={"Origin": "http://malicious.com"},
     )
 
