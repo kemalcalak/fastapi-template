@@ -34,7 +34,20 @@ class User(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None
     )
+    deactivated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    # Partial index (defined in migration) avoids indexing rows that will
+    # never match the deletion query — see ix_user_deletion_due.
+    deletion_scheduled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
 
+    # passive_deletes=True lets Postgres handle the cascade via the FK's
+    # ON DELETE CASCADE — a single DELETE statement instead of one per row.
     activities: Mapped[list["UserActivity"]] = relationship(
-        "UserActivity", back_populates="user"
+        "UserActivity",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
