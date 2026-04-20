@@ -21,7 +21,6 @@ from app.repositories.user import (
     update_user,
 )
 from app.schemas.admin import (
-    AdminUserDetail,
     AdminUserListItem,
     AdminUserListResponse,
     AdminUserUpdate,
@@ -63,7 +62,7 @@ async def list_users_admin_service(
 
 async def get_user_admin_service(
     session: AsyncSession, user_id: uuid.UUID
-) -> AdminUserDetail:
+) -> AdminUserListItem:
     """Return a single user's full admin view or raise 404."""
     user = await get_user_by_id(session, user_id)
     if not user:
@@ -71,7 +70,7 @@ async def get_user_admin_service(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=ErrorMessages.USER_NOT_FOUND,
         )
-    return AdminUserDetail.model_validate(user)
+    return AdminUserListItem.model_validate(user)
 
 
 async def _load_target(session: AsyncSession, user_id: uuid.UUID) -> User:
@@ -100,7 +99,7 @@ async def update_user_admin_service(
     current_user: User,
     user_id: uuid.UUID,
     payload: AdminUserUpdate,
-) -> AdminUserDetail:
+) -> AdminUserListItem:
     """Apply an admin-authored update to a user, honouring last-admin guards."""
     target = await _load_target(session, user_id)
 
@@ -146,7 +145,7 @@ async def update_user_admin_service(
         request=request,
     )
 
-    return AdminUserDetail.model_validate(updated)
+    return AdminUserListItem.model_validate(updated)
 
 
 async def suspend_user_admin_service(
@@ -240,17 +239,20 @@ async def delete_user_admin_service(
             detail=ErrorMessages.ADMIN_CANNOT_DELETE_LAST_ADMIN,
         )
 
+    target_id = target.id
+    target_email = target.email
+
+    await delete_user(session, target)
+
     await log_activity(
         session=session,
         user_id=current_user.id,
         activity_type=ActivityType.DELETE,
         resource_type=ResourceType.USER,
-        resource_id=target.id,
-        details={"action": "admin_deleted_user", "email": target.email},
+        resource_id=target_id,
+        details={"action": "admin_deleted_user", "email": target_email},
         request=request,
     )
-
-    await delete_user(session, target)
 
     return Message(success=True, message=SuccessMessages.ADMIN_USER_DELETED)
 

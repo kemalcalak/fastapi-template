@@ -6,8 +6,9 @@ from fastapi import APIRouter, Query, Request
 from app.api.decorators import audit_unexpected_failure
 from app.api.deps import CurrentSuperUser, SessionDep
 from app.core.messages.success_message import SuccessMessages
+from app.core.rate_limit import rate_limit_strict
 from app.schemas.admin import (
-    AdminUserDetail,
+    AdminUserListItem,
     AdminUserListResponse,
     AdminUserUpdate,
     AdminUserUpdateResponse,
@@ -51,12 +52,12 @@ async def list_users(
     )
 
 
-@router.get("/{user_id}", response_model=AdminUserDetail)
+@router.get("/{user_id}", response_model=AdminUserListItem)
 async def get_user(
     _admin: CurrentSuperUser,
     session: SessionDep,
     user_id: uuid.UUID,
-) -> AdminUserDetail:
+) -> AdminUserListItem:
     """Return the full admin view of a single user."""
     return await get_user_admin_service(session=session, user_id=user_id)
 
@@ -151,6 +152,7 @@ async def delete_user(
 
 
 @router.post("/{user_id}/reset-password", response_model=Message)
+@rate_limit_strict("5/minute")
 @audit_unexpected_failure(
     activity_type=ActivityType.UPDATE,
     resource_type=ResourceType.AUTH,

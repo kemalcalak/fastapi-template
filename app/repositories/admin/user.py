@@ -19,12 +19,15 @@ def _filtered_users_stmt(
     """Build the filtered base statement shared by count and list queries."""
     stmt = select(User)
     if search:
-        like = f"%{search.lower()}%"
+        # ``ILIKE`` on the raw columns so the ``pg_trgm`` GIN indexes on
+        # email/first_name/last_name can actually serve the query. Wrapping
+        # with ``func.lower(...)`` would defeat the index.
+        like = f"%{search}%"
         stmt = stmt.where(
             or_(
-                func.lower(User.email).like(like),
-                func.lower(User.first_name).like(like),
-                func.lower(User.last_name).like(like),
+                User.email.ilike(like),
+                User.first_name.ilike(like),
+                User.last_name.ilike(like),
             )
         )
     if role is not None:

@@ -215,7 +215,7 @@ async def refresh_token_service(
 
     # Refresh works for users in the deletion grace window too (so they stay
     # on the cancel-deletion page without repeatedly re-authenticating). Only
-    # hard-deleted users are blocked.
+    # hard-deleted and admin-suspended users are blocked.
     user = await get_user_by_id(session, parsed_user_id)
     if not user:
         if request:
@@ -231,6 +231,22 @@ async def refresh_token_service(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=ErrorMessages.USER_INACTIVE,
+        )
+
+    if user.suspended_at is not None:
+        if request:
+            await log_activity(
+                session=session,
+                user_id=parsed_user_id,
+                activity_type=ActivityType.LOGIN,
+                resource_type=ResourceType.AUTH,
+                status=ActivityStatus.FAILURE,
+                details={"reason": "account_suspended"},
+                request=request,
+            )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=ErrorMessages.ACCOUNT_SUSPENDED,
         )
 
     return Token(

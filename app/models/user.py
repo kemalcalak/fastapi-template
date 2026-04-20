@@ -23,6 +23,26 @@ class User(Base):
             "deletion_scheduled_at",
             postgresql_where="is_active = false AND deletion_scheduled_at IS NOT NULL",
         ),
+        # pg_trgm GIN indexes powering the admin user search. Without these,
+        # ``col ILIKE '%foo%'`` degrades to a sequential scan on every query.
+        Index(
+            "ix_user_email_trgm",
+            "email",
+            postgresql_using="gin",
+            postgresql_ops={"email": "gin_trgm_ops"},
+        ),
+        Index(
+            "ix_user_first_name_trgm",
+            "first_name",
+            postgresql_using="gin",
+            postgresql_ops={"first_name": "gin_trgm_ops"},
+        ),
+        Index(
+            "ix_user_last_name_trgm",
+            "last_name",
+            postgresql_using="gin",
+            postgresql_ops={"last_name": "gin_trgm_ops"},
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)

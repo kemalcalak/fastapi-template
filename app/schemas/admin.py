@@ -56,14 +56,10 @@ class AdminUserListResponse(BaseModel):
     limit: int
 
 
-class AdminUserDetail(AdminUserListItem):
-    """Full admin view of a single user. Currently identical to the list row."""
-
-
 class AdminUserUpdateResponse(BaseModel):
     """Standard response returned after mutating a user via the admin API."""
 
-    user: AdminUserDetail
+    user: AdminUserListItem
     message: str
 
 
