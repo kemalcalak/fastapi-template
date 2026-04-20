@@ -93,4 +93,5 @@ class AdminStats(BaseModel):
     users_total: int
     users_active: int
     users_verified: int
+    users_admins: int
     activities_total: int

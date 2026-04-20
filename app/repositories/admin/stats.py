@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
 from app.models.user_activity import UserActivity
+from app.schemas.user import SystemRole
 
 
 async def get_admin_stats(session: AsyncSession) -> dict[str, int]:
@@ -11,6 +12,7 @@ async def get_admin_stats(session: AsyncSession) -> dict[str, int]:
         func.count(User.id).label("users_total"),
         func.count().filter(User.is_active.is_(True)).label("users_active"),
         func.count().filter(User.is_verified.is_(True)).label("users_verified"),
+        func.count().filter(User.role == SystemRole.ADMIN.value).label("users_admins"),
     )
     row = (await session.execute(stmt)).one()
 
@@ -22,5 +24,6 @@ async def get_admin_stats(session: AsyncSession) -> dict[str, int]:
         "users_total": row.users_total,
         "users_active": row.users_active,
         "users_verified": row.users_verified,
+        "users_admins": row.users_admins,
         "activities_total": activities_total,
     }

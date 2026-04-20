@@ -44,10 +44,12 @@ async def test_stats_returns_expected_counts(admin_client: AsyncClient):
         "users_total",
         "users_active",
         "users_verified",
+        "users_admins",
         "activities_total",
     }
     assert body["users_total"] >= 4
     assert body["users_active"] >= 4
     assert body["users_verified"] >= 3
     assert body["users_verified"] < body["users_total"]
+    assert body["users_admins"] >= 1
     assert body["activities_total"] >= 1
