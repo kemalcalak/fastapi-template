@@ -28,8 +28,8 @@ from app.schemas.msg import Message
 from app.schemas.token import AuthTokens, Token
 from app.schemas.user import Language, UpdatePassword, UserCreate, UserPublic
 from app.schemas.user_activity import ActivityStatus, ActivityType, ResourceType
-from app.services.user_activity_service import log_activity
 from app.services.user_service import create_user_service
+from app.use_cases.log_activity import log_activity
 from app.utils.email_templates import (
     generate_email_verification_email,
     generate_password_reset_email,

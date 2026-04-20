@@ -2,15 +2,15 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import Select
 
 from app.models.user_activity import UserActivity
 from app.schemas.user_activity import ActivityStatus, ActivityType, ResourceType
 
 
-def _apply_filters(
-    stmt: Select,
+def _filtered_activities_stmt(
     *,
     user_id: uuid.UUID | None,
     activity_type: ActivityType | None,
@@ -19,7 +19,8 @@ def _apply_filters(
     date_from: datetime | None,
     date_to: datetime | None,
 ) -> Select:
-    """Attach admin activity-log filters to a base statement."""
+    """Build the filtered base statement shared by count and list queries."""
+    stmt = select(UserActivity)
     if user_id is not None:
         stmt = stmt.where(UserActivity.user_id == user_id)
     if activity_type is not None:
@@ -48,8 +49,7 @@ async def list_activities_admin(
     date_to: datetime | None = None,
 ) -> tuple[Sequence[UserActivity], int]:
     """Return a filtered, paginated activity page plus the matching total count."""
-    count_stmt = _apply_filters(
-        select(func.count()).select_from(UserActivity),
+    base_stmt = _filtered_activities_stmt(
         user_id=user_id,
         activity_type=activity_type,
         resource_type=resource_type,
@@ -57,19 +57,14 @@ async def list_activities_admin(
         date_from=date_from,
         date_to=date_to,
     )
+
+    count_stmt = base_stmt.with_only_columns(
+        func.count(), maintain_column_froms=True
+    ).order_by(None)
     total = (await session.execute(count_stmt)).scalar_one()
 
-    rows_stmt = _apply_filters(
-        select(UserActivity),
-        user_id=user_id,
-        activity_type=activity_type,
-        resource_type=resource_type,
-        status=status,
-        date_from=date_from,
-        date_to=date_to,
-    )
     rows_stmt = (
-        rows_stmt.order_by(UserActivity.created_at.desc()).offset(skip).limit(limit)
+        base_stmt.order_by(UserActivity.created_at.desc()).offset(skip).limit(limit)
     )
     activities = (await session.execute(rows_stmt)).scalars().all()
 

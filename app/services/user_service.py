@@ -29,7 +29,7 @@ from app.schemas.user import (
     UserUpdateMe,
 )
 from app.schemas.user_activity import ActivityStatus, ActivityType, ResourceType
-from app.services.user_activity_service import log_activity
+from app.use_cases.log_activity import log_activity
 from app.utils.email_templates import generate_account_deactivation_email
 
 

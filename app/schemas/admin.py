@@ -1,9 +1,8 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.core.messages.error_message import ErrorMessages
 from app.schemas.common import ActivityDetails
 from app.schemas.user import SystemRole
 from app.schemas.user_activity import ActivityStatus, ActivityType, ResourceType
@@ -12,6 +11,8 @@ from app.schemas.user_activity import ActivityStatus, ActivityType, ResourceType
 class AdminUserUpdate(BaseModel):
     """Fields an admin may change on another user's account."""
 
+    model_config = ConfigDict(extra="forbid")
+
     first_name: str | None = Field(default=None, max_length=100)
     last_name: str | None = Field(default=None, max_length=100)
     title: str | None = Field(default=None, max_length=100)
@@ -19,14 +20,6 @@ class AdminUserUpdate(BaseModel):
     role: SystemRole | None = None
     is_active: bool | None = None
     is_verified: bool | None = None
-
-    @field_validator("role")
-    @classmethod
-    def validate_role(cls, v: SystemRole | None) -> SystemRole | None:
-        """Ensure role, if provided, matches the SystemRole enum."""
-        if v is not None and v not in SystemRole:
-            raise ValueError(ErrorMessages.INVALID_ROLE)
-        return v
 
 
 class AdminUserListItem(BaseModel):

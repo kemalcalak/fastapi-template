@@ -30,7 +30,7 @@ from app.schemas.admin import (
 from app.schemas.msg import Message
 from app.schemas.user import Language, SystemRole
 from app.schemas.user_activity import ActivityStatus, ActivityType, ResourceType
-from app.services.user_activity_service import log_activity
+from app.use_cases.log_activity import log_activity
 from app.utils.email_templates import generate_password_reset_email
 
 
@@ -141,9 +141,7 @@ async def update_user_admin_service(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=ErrorMessages.ADMIN_CANNOT_DEMOTE_LAST_ADMIN,
             )
-        update_data["role"] = (
-            new_role.value if isinstance(new_role, SystemRole) else new_role
-        )
+        update_data["role"] = new_role.value
 
     if "is_active" in update_data and update_data["is_active"] != target.is_active:
         _guard_not_self(

@@ -24,17 +24,9 @@ async def log_activity(
     status: ActivityStatus = ActivityStatus.SUCCESS,
     request: Request | None = None,
 ) -> UserActivity:
-    """
-    Service to log user activity.
-    Automatically extracts IP address and User-Agent from the request if provided.
-    """
-    ip_address = None
-    user_agent = None
-
-    if request:
-        if request.client:
-            ip_address = request.client.host
-        user_agent = request.headers.get("user-agent")
+    """Record an audit entry, extracting IP and user-agent from the request."""
+    ip_address = request.client.host if request and request.client else None
+    user_agent = request.headers.get("user-agent") if request else None
 
     activity_data = UserActivityCreate(
         user_id=user_id,
