@@ -85,3 +85,12 @@ class AdminActivityListResponse(BaseModel):
     total: int
     skip: int
     limit: int
+
+
+class AdminStats(BaseModel):
+    """Aggregate counts powering the admin dashboard overview."""
+
+    users_total: int
+    users_active: int
+    users_verified: int
+    activities_total: int
