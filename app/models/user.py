@@ -46,6 +46,12 @@ class User(Base):
     deletion_scheduled_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None
     )
+    # Admin-initiated permanent suspension. Distinct from user self-deactivation
+    # (which sets deactivated_at + deletion_scheduled_at). Suspended rows are
+    # never scheduled for deletion, so the deletion worker ignores them.
+    suspended_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
 
     # passive_deletes=True lets Postgres handle the cascade via the FK's
     # ON DELETE CASCADE — a single DELETE statement instead of one per row.

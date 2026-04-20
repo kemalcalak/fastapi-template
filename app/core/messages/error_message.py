@@ -27,6 +27,11 @@ class ErrorMessages:
     ACCOUNT_NOT_DEACTIVATED = "error.account.not_deactivated"
     ACCOUNT_DELETION_EXPIRED = "error.account.deletion_expired"
 
+    # Account suspension (admin-initiated, permanent)
+    ACCOUNT_SUSPENDED = "error.account.suspended"
+    ACCOUNT_ALREADY_SUSPENDED = "error.account.already_suspended"
+    ACCOUNT_NOT_SUSPENDED = "error.account.not_suspended"
+
     # Admin
     ADMIN_CANNOT_MODIFY_SELF = "error.admin.cannot_modify_self"
     ADMIN_CANNOT_DELETE_SELF = "error.admin.cannot_delete_self"

@@ -1,6 +1,6 @@
 """End-to-end tests for /admin/users endpoints.
 
-Covers listing, detail, update, activate/deactivate, delete, password reset,
+Covers listing, detail, update, suspend/unsuspend, delete, password reset,
 self-protection, and the last-admin repository guard.
 """
 
@@ -175,14 +175,14 @@ async def test_is_last_active_admin_repository():
 
 
 @pytest.mark.asyncio
-async def test_deactivate_and_activate_user(admin_client: AsyncClient):
-    """Deactivate then re-activate a user and verify DB state on both sides."""
+async def test_suspend_and_unsuspend_user(admin_client: AsyncClient):
+    """Suspend then unsuspend a user; suspended rows never get a deletion schedule."""
     await register_and_verify(admin_client, "toggle@test.com")
     user_id = await get_user_id("toggle@test.com")
 
-    response = await admin_client.post(f"/admin/users/{user_id}/deactivate")
+    response = await admin_client.post(f"/admin/users/{user_id}/suspend")
     assert response.status_code == 200
-    assert response.json()["message"] == SuccessMessages.ADMIN_USER_DEACTIVATED
+    assert response.json()["message"] == SuccessMessages.ADMIN_USER_SUSPENDED
 
     async with TestingSessionLocal() as session:
         user = (
@@ -191,11 +191,13 @@ async def test_deactivate_and_activate_user(admin_client: AsyncClient):
             .one()
         )
         assert user.is_active is False
-        assert user.deletion_scheduled_at is not None
+        assert user.suspended_at is not None
+        # Critical invariant: admin suspension must NOT schedule deletion.
+        assert user.deletion_scheduled_at is None
 
-    response = await admin_client.post(f"/admin/users/{user_id}/activate")
+    response = await admin_client.post(f"/admin/users/{user_id}/unsuspend")
     assert response.status_code == 200
-    assert response.json()["message"] == SuccessMessages.ADMIN_USER_ACTIVATED
+    assert response.json()["message"] == SuccessMessages.ADMIN_USER_UNSUSPENDED
 
     async with TestingSessionLocal() as session:
         user = (
@@ -204,16 +206,41 @@ async def test_deactivate_and_activate_user(admin_client: AsyncClient):
             .one()
         )
         assert user.is_active is True
-        assert user.deletion_scheduled_at is None
+        assert user.suspended_at is None
 
 
 @pytest.mark.asyncio
-async def test_admin_cannot_deactivate_self(admin_client: AsyncClient):
-    """Self-deactivation must be blocked for admins."""
+async def test_admin_cannot_suspend_self(admin_client: AsyncClient):
+    """Self-suspension must be blocked for admins."""
     admin_id = await get_user_id("admin@test.com")
-    response = await admin_client.post(f"/admin/users/{admin_id}/deactivate")
+    response = await admin_client.post(f"/admin/users/{admin_id}/suspend")
     assert response.status_code == 400
     assert response.json()["error"] == ErrorMessages.ADMIN_CANNOT_MODIFY_SELF
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_suspend_already_suspended(admin_client: AsyncClient):
+    """Re-suspending a suspended user returns the dedicated error code."""
+    await register_and_verify(admin_client, "already-suspended@test.com")
+    user_id = await get_user_id("already-suspended@test.com")
+
+    first = await admin_client.post(f"/admin/users/{user_id}/suspend")
+    assert first.status_code == 200
+
+    second = await admin_client.post(f"/admin/users/{user_id}/suspend")
+    assert second.status_code == 400
+    assert second.json()["error"] == ErrorMessages.ACCOUNT_ALREADY_SUSPENDED
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_unsuspend_not_suspended(admin_client: AsyncClient):
+    """Unsuspending an active user returns the dedicated error code."""
+    await register_and_verify(admin_client, "never-suspended@test.com")
+    user_id = await get_user_id("never-suspended@test.com")
+
+    response = await admin_client.post(f"/admin/users/{user_id}/unsuspend")
+    assert response.status_code == 400
+    assert response.json()["error"] == ErrorMessages.ACCOUNT_NOT_SUSPENDED
 
 
 @pytest.mark.asyncio

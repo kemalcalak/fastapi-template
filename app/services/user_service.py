@@ -114,6 +114,14 @@ async def reactivate_own_account_service(
     request: Request, session: AsyncSession, current_user: User
 ) -> Message:
     """Cancel a pending deletion and re-enable the account."""
+    # Admin-suspended accounts cannot self-recover, even if an old session
+    # token is still in hand. Only an admin unsuspend lifts this state.
+    if current_user.suspended_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=ErrorMessages.ACCOUNT_SUSPENDED,
+        )
+
     if current_user.deletion_scheduled_at is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

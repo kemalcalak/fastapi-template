@@ -113,6 +113,25 @@ async def authenticate(
             detail=ErrorMessages.INVALID_CREDENTIALS,
         )
 
+    # Admin-suspended accounts are permanently locked out. This guard must run
+    # before the grace-window fall-through below, otherwise a suspended user
+    # would still receive tokens.
+    if user.suspended_at is not None:
+        if request:
+            await log_activity(
+                session=session,
+                user_id=user.id,
+                activity_type=ActivityType.LOGIN,
+                resource_type=ResourceType.AUTH,
+                status=ActivityStatus.FAILURE,
+                details={"reason": "account_suspended", "email": email},
+                request=request,
+            )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=ErrorMessages.ACCOUNT_SUSPENDED,
+        )
+
     # Accounts in the deletion grace window (is_active=False + deletion_scheduled_at)
     # are allowed to log in so the frontend can render the "cancel deletion" page.
     # The ``get_current_active_user`` dep still blocks them from regular endpoints.

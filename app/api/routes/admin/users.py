@@ -16,12 +16,12 @@ from app.schemas.msg import Message
 from app.schemas.user import Language, SystemRole
 from app.schemas.user_activity import ActivityType, ResourceType
 from app.services.admin.user_service import (
-    activate_user_admin_service,
-    deactivate_user_admin_service,
     delete_user_admin_service,
     get_user_admin_service,
     list_users_admin_service,
     reset_password_admin_service,
+    suspend_user_admin_service,
+    unsuspend_user_admin_service,
     update_user_admin_service,
 )
 
@@ -87,20 +87,20 @@ async def update_user(
     )
 
 
-@router.post("/{user_id}/activate", response_model=Message)
+@router.post("/{user_id}/suspend", response_model=Message)
 @audit_unexpected_failure(
     activity_type=ActivityType.UPDATE,
     resource_type=ResourceType.USER,
-    endpoint="/admin/users/{user_id}/activate",
+    endpoint="/admin/users/{user_id}/suspend",
 )
-async def activate_user(
+async def suspend_user(
     request: Request,
     current_user: CurrentSuperUser,
     session: SessionDep,
     user_id: uuid.UUID,
 ) -> Message:
-    """Reactivate a deactivated user and cancel any scheduled deletion."""
-    return await activate_user_admin_service(
+    """Permanently suspend a user. Only an admin can later unsuspend them."""
+    return await suspend_user_admin_service(
         request=request,
         session=session,
         current_user=current_user,
@@ -108,20 +108,20 @@ async def activate_user(
     )
 
 
-@router.post("/{user_id}/deactivate", response_model=Message)
+@router.post("/{user_id}/unsuspend", response_model=Message)
 @audit_unexpected_failure(
     activity_type=ActivityType.UPDATE,
     resource_type=ResourceType.USER,
-    endpoint="/admin/users/{user_id}/deactivate",
+    endpoint="/admin/users/{user_id}/unsuspend",
 )
-async def deactivate_user(
+async def unsuspend_user(
     request: Request,
     current_user: CurrentSuperUser,
     session: SessionDep,
     user_id: uuid.UUID,
 ) -> Message:
-    """Deactivate a user and start the configured deletion grace window."""
-    return await deactivate_user_admin_service(
+    """Lift an existing admin suspension and re-enable the account."""
+    return await unsuspend_user_admin_service(
         request=request,
         session=session,
         current_user=current_user,

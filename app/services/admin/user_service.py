@@ -14,11 +14,11 @@ from app.repositories.admin.user import (
     list_users_admin,
 )
 from app.repositories.user import (
-    deactivate_user,
     delete_user,
     get_user_by_email,
     get_user_by_id,
-    reactivate_user,
+    suspend_user,
+    unsuspend_user,
     update_user,
 )
 from app.schemas.admin import (
@@ -171,13 +171,17 @@ async def update_user_admin_service(
     return AdminUserDetail.model_validate(updated)
 
 
-async def deactivate_user_admin_service(
+async def suspend_user_admin_service(
     request: Request,
     session: AsyncSession,
     current_user: User,
     user_id: uuid.UUID,
 ) -> Message:
-    """Deactivate a user immediately with the configured deletion grace window."""
+    """Permanently suspend a user.
+
+    The suspended account cannot log in and cannot self-reactivate. It is never
+    auto-deleted — only an admin may lift the suspension via unsuspend.
+    """
     target = await _load_target(session, user_id)
     _guard_not_self(current_user.id, target.id, ErrorMessages.ADMIN_CANNOT_MODIFY_SELF)
 
@@ -189,15 +193,13 @@ async def deactivate_user_admin_service(
             detail=ErrorMessages.ADMIN_CANNOT_DEMOTE_LAST_ADMIN,
         )
 
-    if not target.is_active:
+    if target.suspended_at is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=ErrorMessages.ACCOUNT_ALREADY_DEACTIVATED,
+            detail=ErrorMessages.ACCOUNT_ALREADY_SUSPENDED,
         )
 
-    await deactivate_user(
-        session, target, grace_days=settings.ACCOUNT_DELETION_GRACE_DAYS
-    )
+    await suspend_user(session, target)
 
     await log_activity(
         session=session,
@@ -205,32 +207,29 @@ async def deactivate_user_admin_service(
         activity_type=ActivityType.UPDATE,
         resource_type=ResourceType.USER,
         resource_id=target.id,
-        details={
-            "action": "admin_deactivated_user",
-            "grace_days": settings.ACCOUNT_DELETION_GRACE_DAYS,
-        },
+        details={"action": "admin_suspended_user"},
         request=request,
     )
 
-    return Message(success=True, message=SuccessMessages.ADMIN_USER_DEACTIVATED)
+    return Message(success=True, message=SuccessMessages.ADMIN_USER_SUSPENDED)
 
 
-async def activate_user_admin_service(
+async def unsuspend_user_admin_service(
     request: Request,
     session: AsyncSession,
     current_user: User,
     user_id: uuid.UUID,
 ) -> Message:
-    """Reactivate a previously deactivated user and clear the scheduled deletion."""
+    """Lift an existing admin suspension and re-enable the account."""
     target = await _load_target(session, user_id)
 
-    if target.is_active:
+    if target.suspended_at is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=ErrorMessages.ACCOUNT_NOT_DEACTIVATED,
+            detail=ErrorMessages.ACCOUNT_NOT_SUSPENDED,
         )
 
-    await reactivate_user(session, target)
+    await unsuspend_user(session, target)
 
     await log_activity(
         session=session,
@@ -238,11 +237,11 @@ async def activate_user_admin_service(
         activity_type=ActivityType.UPDATE,
         resource_type=ResourceType.USER,
         resource_id=target.id,
-        details={"action": "admin_activated_user"},
+        details={"action": "admin_unsuspended_user"},
         request=request,
     )
 
-    return Message(success=True, message=SuccessMessages.ADMIN_USER_ACTIVATED)
+    return Message(success=True, message=SuccessMessages.ADMIN_USER_UNSUSPENDED)
 
 
 async def delete_user_admin_service(
