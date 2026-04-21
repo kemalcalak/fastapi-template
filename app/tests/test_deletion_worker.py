@@ -143,3 +143,28 @@ async def test_repository_helpers_return_expected_set():
 
         for user in due:
             await hard_delete_user(session, user)
+
+
+@pytest.mark.asyncio
+async def test_suspended_user_is_never_due_for_deletion():
+    """Suspended rows must be skipped even if a stale deletion_scheduled_at exists.
+
+    Guards the invariant that admin-suspended accounts are permanent and never
+    auto-deleted — the worker filter defends against any future code path that
+    might accidentally set deletion_scheduled_at on a suspended row.
+    """
+    async with TestingSessionLocal() as session:
+        suspended = User(
+            email="suspended-worker@test.com",
+            hashed_password=get_password_hash("password123"),
+            is_active=False,
+            is_verified=True,
+            suspended_at=utc_now(),
+            # Deliberately drift: simulate a buggy writer that set both fields.
+            deletion_scheduled_at=utc_now() - timedelta(hours=1),
+        )
+        session.add(suspended)
+        await session.commit()
+
+        due = await get_users_due_for_deletion(session, now=utc_now(), limit=10)
+        assert all(u.email != "suspended-worker@test.com" for u in due)

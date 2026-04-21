@@ -28,8 +28,8 @@ from app.schemas.msg import Message
 from app.schemas.token import AuthTokens, Token
 from app.schemas.user import Language, UpdatePassword, UserCreate, UserPublic
 from app.schemas.user_activity import ActivityStatus, ActivityType, ResourceType
-from app.services.user_activity_service import log_activity
 from app.services.user_service import create_user_service
+from app.use_cases.log_activity import log_activity
 from app.utils.email_templates import (
     generate_email_verification_email,
     generate_password_reset_email,
@@ -111,6 +111,25 @@ async def authenticate(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=ErrorMessages.INVALID_CREDENTIALS,
+        )
+
+    # Admin-suspended accounts are permanently locked out. This guard must run
+    # before the grace-window fall-through below, otherwise a suspended user
+    # would still receive tokens.
+    if user.suspended_at is not None:
+        if request:
+            await log_activity(
+                session=session,
+                user_id=user.id,
+                activity_type=ActivityType.LOGIN,
+                resource_type=ResourceType.AUTH,
+                status=ActivityStatus.FAILURE,
+                details={"reason": "account_suspended", "email": email},
+                request=request,
+            )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=ErrorMessages.ACCOUNT_SUSPENDED,
         )
 
     # Accounts in the deletion grace window (is_active=False + deletion_scheduled_at)
@@ -196,7 +215,7 @@ async def refresh_token_service(
 
     # Refresh works for users in the deletion grace window too (so they stay
     # on the cancel-deletion page without repeatedly re-authenticating). Only
-    # hard-deleted users are blocked.
+    # hard-deleted and admin-suspended users are blocked.
     user = await get_user_by_id(session, parsed_user_id)
     if not user:
         if request:
@@ -212,6 +231,22 @@ async def refresh_token_service(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=ErrorMessages.USER_INACTIVE,
+        )
+
+    if user.suspended_at is not None:
+        if request:
+            await log_activity(
+                session=session,
+                user_id=parsed_user_id,
+                activity_type=ActivityType.LOGIN,
+                resource_type=ResourceType.AUTH,
+                status=ActivityStatus.FAILURE,
+                details={"reason": "account_suspended"},
+                request=request,
+            )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=ErrorMessages.ACCOUNT_SUSPENDED,
         )
 
     return Token(

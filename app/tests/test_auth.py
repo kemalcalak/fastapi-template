@@ -318,3 +318,34 @@ async def test_change_password(client: AsyncClient):
         "/auth/login", data={"username": email, "password": old_password}
     )
     assert old_login_response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_suspended_user_login_returns_account_suspended(client: AsyncClient):
+    """A suspended account must be refused at login with the dedicated code."""
+    from sqlalchemy import update
+
+    from app.models.user import User
+    from app.tests.conftest import TestingSessionLocal
+    from app.utils import utc_now
+
+    email = "suspended@test.com"
+    password = "password123"
+    await client.post(
+        "/auth/register",
+        json={"email": email, "password": password, "first_name": "Sus"},
+    )
+
+    async with TestingSessionLocal() as session:
+        await session.execute(
+            update(User)
+            .where(User.email == email)
+            .values(is_verified=True, is_active=False, suspended_at=utc_now())
+        )
+        await session.commit()
+
+    response = await client.post(
+        "/auth/login", data={"username": email, "password": password}
+    )
+    assert response.status_code == 403
+    assert response.json()["error"] == ErrorMessages.ACCOUNT_SUSPENDED

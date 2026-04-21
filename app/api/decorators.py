@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
 from app.schemas.user_activity import ActivityStatus, ActivityType, ResourceType
-from app.services.user_activity_service import log_activity
+from app.use_cases.log_activity import log_activity
 
 _UNKNOWN_USER_ID = uuid.UUID(int=0)
 """Placeholder used when an unexpected failure fires before the caller is known.

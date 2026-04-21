@@ -202,6 +202,29 @@ async def test_reactivate_on_active_account_returns_400(auth_client: AsyncClient
 
 
 @pytest.mark.asyncio
+async def test_suspended_user_cannot_self_reactivate(auth_client: AsyncClient):
+    """Admin-suspended users must not be able to lift their own suspension."""
+    from sqlalchemy import update
+
+    from app.core.messages.error_message import ErrorMessages
+    from app.models.user import User
+    from app.tests.conftest import TestingSessionLocal
+    from app.utils import utc_now
+
+    async with TestingSessionLocal() as session:
+        await session.execute(
+            update(User)
+            .where(User.email == "user_test@test.com")
+            .values(is_active=False, suspended_at=utc_now())
+        )
+        await session.commit()
+
+    response = await auth_client.post("/users/me/reactivate")
+    assert response.status_code == 403
+    assert response.json()["error"] == ErrorMessages.ACCOUNT_SUSPENDED
+
+
+@pytest.mark.asyncio
 async def test_me_exposes_deletion_schedule(auth_client: AsyncClient):
     """GET /users/me must include deletion_scheduled_at for deactivated users."""
     await auth_client.request(

@@ -91,6 +91,41 @@ async def reactivate_user(session: AsyncSession, user: User) -> User:
     return db_user
 
 
+async def suspend_user(session: AsyncSession, user: User) -> User:
+    """Admin-initiated permanent suspension.
+
+    Sets ``is_active=False`` and stamps ``suspended_at``. Deliberately does NOT
+    set ``deletion_scheduled_at`` — suspended accounts are never auto-deleted
+    by the cleanup worker and the target user cannot self-reactivate.
+    """
+    locked = await session.execute(
+        select(User).where(User.id == user.id).with_for_update()
+    )
+    db_user = locked.scalars().one()
+
+    db_user.is_active = False
+    db_user.suspended_at = utc_now()
+    session.add(db_user)
+    await session.commit()
+    await session.refresh(db_user)
+    return db_user
+
+
+async def unsuspend_user(session: AsyncSession, user: User) -> User:
+    """Lift an admin suspension and re-enable the account."""
+    locked = await session.execute(
+        select(User).where(User.id == user.id).with_for_update()
+    )
+    db_user = locked.scalars().one()
+
+    db_user.is_active = True
+    db_user.suspended_at = None
+    session.add(db_user)
+    await session.commit()
+    await session.refresh(db_user)
+    return db_user
+
+
 async def get_users_due_for_deletion(
     session: AsyncSession, now: datetime, limit: int
 ) -> Sequence[User]:
@@ -105,6 +140,9 @@ async def get_users_due_for_deletion(
             User.is_active.is_(False),
             User.deletion_scheduled_at.is_not(None),
             User.deletion_scheduled_at <= now,
+            # Admin-suspended rows must never be auto-deleted, even if a stale
+            # deletion_scheduled_at is ever present alongside suspended_at.
+            User.suspended_at.is_(None),
         )
         .order_by(User.deletion_scheduled_at)
         .with_for_update(skip_locked=True)

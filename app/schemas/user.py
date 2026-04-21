@@ -91,6 +91,7 @@ class UserPublic(UserBase):
     updated_at: datetime
     deactivated_at: datetime | None = None
     deletion_scheduled_at: datetime | None = None
+    suspended_at: datetime | None = None
 
 
 class UserUpdateResponse(BaseModel):
