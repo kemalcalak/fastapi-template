@@ -169,6 +169,36 @@ This project uses [Ruff](https://docs.astral.sh/ruff/) for both code linting and
 - **Format code:** `uv run ruff format .`
 - **Auto-fix lint issues:** `uv run ruff check --fix .`
 
+### Git Hooks (pre-commit)
+
+The repo ships a `.pre-commit-config.yaml`. After cloning, install both hook stages once:
+
+```bash
+uv run pre-commit install --hook-type pre-commit --hook-type pre-push
+```
+
+**`pre-commit`** (~5–15 s) — runs on every `git commit` against staged files:
+
+- `trim trailing whitespace`, `end-of-file-fixer`, `check-yaml`, `check-toml`, `check-added-large-files`, `check-merge-conflict`, `detect-private-key`
+- `ruff check --fix` (auto-fix lint)
+- `ruff format`
+
+**`pre-push`** (~30–60 s) — runs on every `git push`:
+
+- `uv run pytest` — full test suite must pass before code leaves the machine.
+
+To run all hooks manually against the whole repo: `uv run pre-commit run --all-files`.
+
+### Metrics (Prometheus)
+
+`prometheus-fastapi-instrumentator` exposes `GET /metrics` (outside `/api/v1`, hidden from Swagger). Default metrics: request count, latency histograms, in-progress requests, exceptions per handler. Health endpoints and `/metrics` itself are excluded from instrumentation to avoid noise.
+
+```bash
+curl http://localhost:8000/metrics
+```
+
+> In production, restrict `/metrics` at the reverse proxy (e.g. allowlist Prometheus scraper IPs) — it is intentionally unauthenticated for scraper compatibility.
+
 ---
 
 ## 📂 Project Structure

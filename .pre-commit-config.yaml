@@ -16,3 +16,15 @@ repos:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
+
+  # Pre-push only — test suite must pass before code leaves the machine.
+  # Kept out of pre-commit so day-to-day commits stay fast.
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: uv run pytest
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
