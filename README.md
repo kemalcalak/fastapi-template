@@ -223,6 +223,32 @@ scrape_configs:
 
 > Even with the token, prefer to also restrict `/metrics` at the reverse proxy (Prometheus scraper IP allowlist or VPC-internal-only exposure). Defense-in-depth — the token is one layer, network policy is another.
 
+### Tracing (OpenTelemetry)
+
+Metrics tell you *what* is slow ("p99 latency on `/users/{id}` doubled at 14:02"). Traces tell you *why* — a single request's full waterfall: route handler → SQLAlchemy queries → Redis calls → outbound httpx requests, each with its own span and timing.
+
+**Opt-in by design.** When `OTEL_EXPORTER_OTLP_ENDPOINT` is unset, `init_telemetry()` returns early and there is **zero overhead** — no spans created, no exporter started, no extra allocations. Local dev and the test suite stay clean.
+
+**Wiring (`app/core/telemetry.py`):**
+
+| Layer | Instrumentation | What you get |
+| --- | --- | --- |
+| FastAPI | `FastAPIInstrumentor` | Per-request span named after the route template (`/users/{id}`, not `/users/42`); `/metrics` and `/health` excluded |
+| SQLAlchemy | `SQLAlchemyInstrumentor` | One span per query, with the SQL statement and duration |
+| Redis | `RedisInstrumentor` | One span per Redis call (cache hits, rate-limit checks, pub/sub) |
+| httpx | `HTTPXClientInstrumentor` | Outbound HTTP spans (e.g. disposable-email blocklist refresh) |
+
+**Enabling traces:** point `OTEL_EXPORTER_OTLP_ENDPOINT` at any OTLP/HTTP collector — Tempo, Jaeger, Honeycomb, the OTel Collector, etc.
+
+```bash
+# .env
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+OTEL_SERVICE_NAME=fastapi-template
+```
+
+The SDK reads every other `OTEL_*` variable natively (sampler, headers, batch size, etc.) — see the [OTel SDK environment variables reference](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/) for the full list.
+
 ---
 
 ## 📂 Project Structure
