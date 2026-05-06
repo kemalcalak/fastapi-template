@@ -16,8 +16,10 @@ While FastAPI is incredibly fast and flexible, it doesn't enforce a specific pro
 
 ## 🔗 Frontend Compatibility
 
-This backend template is designed to seamlessly integrate with the companion **React + TypeScript + Vite Enterprise Template**.
-You can find the frontend template here: [kemalcalak/React-Template](https://github.com/kemalcalak/React-Template).
+This backend template is designed to seamlessly integrate with the companion **Next.js 16 + React 19 + TypeScript Enterprise Template**.
+You can find the frontend template here: [kemalcalak/NextJS-Template](https://github.com/kemalcalak/NextJS-Template).
+
+The two templates share the same auth contract: HttpOnly `access_token` / `refresh_token` cookies, `/api/v1` prefix, `X-Requested-With` CSRF header, and a uniform `{ success, data, message, error }` response envelope.
 
 ---
 
@@ -26,16 +28,20 @@ You can find the frontend template here: [kemalcalak/React-Template](https://git
 This template integrates the best-in-class Python ecosystem tools to provide a seamless developer experience:
 
 - **Framework:** [FastAPI](https://fastapi.tiangolo.com/) for building APIs with Python 3.12+ based on standard Python type hints.
-- **Architecture:** Strict Layered Architecture separating routers, services, repositories, and models, fully utilizing FastAPI's dependency injection.
+- **Architecture:** Strict Layered Architecture separating routers, services, repositories, use cases, and models, fully utilizing FastAPI's dependency injection.
 - **Database & ORM:** [SQLAlchemy 2.0](https://www.sqlalchemy.org/) with `asyncpg` for non-blocking operations, and [Alembic](https://alembic.sqlalchemy.org/) for schema migrations.
 - **Observability & Error Tracking:** [Sentry](https://sentry.io/) built-in integration for tracking unhandled exceptions and performance tracing.
 - **Caching:** [Redis](https://redis.io/) integration using `redis.asyncio` for robust, high-performance distributed caching.
 - **Validation & Config:** [Pydantic v2](https://docs.pydantic.dev/latest/) and `pydantic-settings` for robust data validation and environment management.
-- **Security & Auth:** Built-in JWT validation, `bcrypt` password hashing, and [Slowapi](https://slowapi.readthedocs.io/en/latest/) for rate limiting and brute force protection.
+- **Security & Auth:** JWT access/refresh tokens accepted via either HttpOnly cookies *or* `Authorization: Bearer`, `bcrypt` password hashing, **Redis-backed token blacklist** (logout invalidation), strict origin-check middleware (returns 404 for foreign origins), and [Slowapi](https://slowapi.readthedocs.io/en/latest/) rate limiting for brute-force protection.
+- **Account Lifecycle:** Email verification, password reset, password change, and **soft-delete with grace period** — accounts marked for deletion can be reactivated until the cron worker purges them.
+- **Background Jobs:** [arq](https://arq-docs.helpmanual.io/) worker (separate container in compose) runs cron jobs such as `delete_expired_accounts` at the configured time.
+- **Audit Trail:** `user_activity` table records auth events and CRUD actions with IP / user agent. The `audit_unexpected_failure` decorator captures unexpected route failures.
 - **Smart Email Validation & Delivery:** Built-in asynchronous email sending with SMTP, domain MX record checking using `dnspython`, and auto-updating disposable email provider filtering via Redis cache.
 - **Standardized API Responses:** Global exception handlers standardizing success/error schemas, utilizing a centralized `messages` module (`app/core/messages/`) to prevent hardcoded responses.
+- **First Superuser Seed:** On startup, an initial admin is created from `FIRST_SUPERUSER` / `FIRST_SUPERUSER_PASSWORD` if none exists.
 - **Tooling:** [uv](https://docs.astral.sh/uv/) for blazing-fast package management, and [Ruff](https://docs.astral.sh/ruff/) for linting and formatting.
-- **Testing:** Comprehensive async testing setup with `pytest` and `pytest-asyncio`.
+- **Testing:** Comprehensive async testing setup with `pytest` and `pytest-asyncio`, in-memory SQLite via `aiosqlite`, `fakeredis`, and autouse SMTP/MX patches — tests never hit Postgres or the network.
 
 ---
 
@@ -104,17 +110,26 @@ SMTP_USE_SSL=False
 SMTP_USER="smtp_username"
 SMTP_PASSWORD="smtp_password"
 EMAILS_FROM_EMAIL="noreply@example.com"
+
+# Sentry (only initialized when ENVIRONMENT != "local")
+SENTRY_DSN=
 ```
 
 ### 3. Start the Application via Docker
 
-This project provides a `docker-compose.yaml` to spin up the entire stack, including the backend service, a local PostgreSQL instance, and a Redis container:
+This project provides a `docker-compose.yaml` to spin up the entire stack, including the backend service, a local PostgreSQL instance, a Redis container, and the **arq background worker**:
 
 ```bash
 docker-compose up -d --build
 ```
 
 The API will be available at `http://localhost:8000`. You can test the endpoints via the Swagger UI available at `http://localhost:8000/docs`.
+
+To run the worker manually (e.g. when developing the API on the host):
+
+```bash
+uv run arq app.worker.settings.WorkerSettings
+```
 
 ### 4. Run Migrations
 
@@ -160,22 +175,27 @@ This project uses [Ruff](https://docs.astral.sh/ruff/) for both code linting and
 
 ```bash
 ├── app/
-│   ├── alembic/          # Database migration configurations
-│   ├── api/              # API Layer: FastAPI routers and route handlers
-│   ├── core/             # Core configurations, security, exceptions, logging
-│   ├── models/           # Domain Layer: SQLAlchemy definitions
-│   ├── repositories/     # Data Layer: Database operations and queries
-│   ├── schemas/          # API Layer: Pydantic request/response schemas
-│   ├── services/         # Business Logic Layer: Core use cases and orchestration
-│   ├── tests/            # Test suite (integration and unit tests)
-│   ├── utils/            # Helper functions and shared utilities
-│   └── main.py           # Application entry point
+│   ├── alembic/          # Alembic env + versions/ (generated migration scripts)
+│   ├── api/              # API Layer: routers, deps.py, exception handlers, decorators
+│   │   └── routes/
+│   │       ├── auth.py, users.py, health.py
+│   │       └── admin/    # Admin surface (gated by CurrentSuperUser)
+│   ├── core/             # config, db, security, redis, rate_limit, email, messages/
+│   ├── models/           # Domain Layer: SQLAlchemy ORM (User, UserActivity, …)
+│   ├── repositories/     # Data Layer: async DB queries (no business rules)
+│   ├── schemas/          # Pydantic v2 DTOs (Create / Update / Response per domain)
+│   ├── services/         # Business Logic Layer: pure async functions, take AsyncSession
+│   ├── use_cases/        # Cross-domain orchestration (e.g. activity logging)
+│   ├── worker/           # arq worker — settings + cron jobs (e.g. account deletion)
+│   ├── utils/            # Helper functions (datetime, email templates)
+│   ├── tests/            # pytest suite (in-memory SQLite, fakeredis, mocked SMTP)
+│   └── main.py           # FastAPI app, lifespan, CORS + origin middleware
 ├── alembic.ini           # Alembic settings
-├── docker-compose.yaml   # Docker compose configuration (DB & Redis)
-├── Dockerfile            # Dockerfile for backend container
+├── docker-compose.yaml   # Compose stack: backend + worker + db + redis
+├── dockerfile            # Backend image (uv-based multi-stage build)
 ├── pyproject.toml        # Project dependencies and tool configurations
 ├── pytest.ini            # Pytest settings
-└── uv.lock               # Dependency lock file
+└── uv.lock               # Dependency lock file (commit alongside dep changes)
 ```
 
 ---

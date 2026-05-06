@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
+from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException
 from starlette.middleware.cors import CORSMiddleware
@@ -24,8 +25,14 @@ from app.core.redis import close_redis, init_redis
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
-    """Generate a stable operationId for OpenAPI clients."""
-    return f"{route.tags[0]}-{route.name}"
+    """Generate a stable operationId for OpenAPI clients.
+
+    Falls back to the bare route name for routes without tags (e.g. the
+    Prometheus /metrics endpoint registered by the instrumentator).
+    """
+    if route.tags:
+        return f"{route.tags[0]}-{route.name}"
+    return route.name
 
 
 if settings.SENTRY_DSN and settings.ENVIRONMENT != "local":
@@ -109,3 +116,10 @@ if settings.all_cors_origins:
     )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Prometheus metrics — exposes GET /metrics (outside API_V1_STR so scrapers
+# don't need auth headers). Kept out of OpenAPI/Swagger to avoid noise.
+# In production, restrict /metrics at the reverse proxy or with allowlists.
+Instrumentator(
+    excluded_handlers=["/metrics", f"{settings.API_V1_STR}/health/.*"],
+).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
