@@ -2,10 +2,11 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import sentry_sdk
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Header, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.routing import APIRoute
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException
@@ -117,9 +118,31 @@ if settings.all_cors_origins:
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
-# Prometheus metrics — exposes GET /metrics (outside API_V1_STR so scrapers
-# don't need auth headers). Kept out of OpenAPI/Swagger to avoid noise.
-# In production, restrict /metrics at the reverse proxy or with allowlists.
+# Prometheus instrumentation — collect metrics for every handled request.
+# Health and /metrics itself are excluded from instrumentation to keep noise
+# out of the time series.
 Instrumentator(
     excluded_handlers=["/metrics", f"{settings.API_V1_STR}/health/.*"],
-).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+).instrument(app)
+
+
+@app.get("/metrics", include_in_schema=False)
+async def metrics_endpoint(
+    authorization: str | None = Header(default=None),
+) -> Response:
+    """Expose Prometheus metrics in the standard exposition format.
+
+    Local dev keeps the endpoint open for convenience. In every other
+    environment a bearer token (METRICS_TOKEN) is required; mismatched or
+    missing tokens return 404 to avoid disclosing the endpoint to outsiders.
+    """
+    if settings.ENVIRONMENT != "local":
+        expected = (
+            f"Bearer {settings.METRICS_TOKEN}" if settings.METRICS_TOKEN else None
+        )
+        if expected is None or authorization != expected:
+            raise HTTPException(
+                status_code=404,
+                detail=ErrorMessages.RESOURCE_NOT_FOUND,
+            )
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)

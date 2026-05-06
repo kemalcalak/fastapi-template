@@ -191,13 +191,37 @@ To run all hooks manually against the whole repo: `uv run pre-commit run --all-f
 
 ### Metrics (Prometheus)
 
-`prometheus-fastapi-instrumentator` exposes `GET /metrics` (outside `/api/v1`, hidden from Swagger). Default metrics: request count, latency histograms, in-progress requests, exceptions per handler. Health endpoints and `/metrics` itself are excluded from instrumentation to avoid noise.
+`prometheus-fastapi-instrumentator` collects metrics for every handled request. The `/metrics` endpoint (root path, **outside `/api/v1`**, hidden from Swagger) exposes them in the standard Prometheus exposition format. Default metrics: request count, latency histograms, in-progress requests, exceptions per handler, plus the standard Python runtime + process metrics. Health endpoints and `/metrics` itself are excluded from instrumentation to avoid noise.
+
+**Auth model — three layers:**
+
+1. **`include_in_schema=False`** — the endpoint is invisible in Swagger / OpenAPI.
+2. **Environment-gated bearer token** — outside `ENVIRONMENT="local"`, the endpoint requires `Authorization: Bearer ${METRICS_TOKEN}`. Mismatched or missing tokens return **404** (not 401/403) so the endpoint's existence is not disclosed.
+3. **`origin_check_middleware`** — browser cross-origin requests with a foreign `Origin` header are rejected by the global middleware, regardless of the token.
+
+**Local dev — open access:**
 
 ```bash
 curl http://localhost:8000/metrics
 ```
 
-> In production, restrict `/metrics` at the reverse proxy (e.g. allowlist Prometheus scraper IPs) — it is intentionally unauthenticated for scraper compatibility.
+**Production / staging — bearer token required:**
+
+```bash
+# .env (or your secret store)
+METRICS_TOKEN=$(openssl rand -hex 32)
+
+# Prometheus scrape config (prometheus.yml)
+scrape_configs:
+  - job_name: fastapi
+    authorization:
+      type: Bearer
+      credentials: <your METRICS_TOKEN>
+    static_configs:
+      - targets: ['api.example.com:8000']
+```
+
+> Even with the token, prefer to also restrict `/metrics` at the reverse proxy (Prometheus scraper IP allowlist or VPC-internal-only exposure). Defense-in-depth — the token is one layer, network policy is another.
 
 ---
 

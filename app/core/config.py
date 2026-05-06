@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     PROJECT_NAME: str
     SENTRY_DSN: str | None = None
 
+    # Bearer token required to scrape /metrics outside ENVIRONMENT="local".
+    # When unset (or wrong), /metrics returns 404 to mirror origin_check_middleware
+    # and avoid disclosing endpoint existence. Local dev keeps /metrics open.
+    METRICS_TOKEN: str | None = None
+
     SMTP_HOST: str | None = None
     SMTP_PORT: int = 587
     SMTP_USE_STARTTLS: bool = True
