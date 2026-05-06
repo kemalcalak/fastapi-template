@@ -1,12 +1,13 @@
 import logging
 
-from fastapi import Request, status
+from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.messages.error_message import ErrorMessages
+from app.core.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -75,3 +76,16 @@ async def rate_limit_exception_handler(_request: Request, exc: RateLimitExceeded
             "detail": str(exc),
         },
     )
+
+
+def register_exception_handlers(app: FastAPI) -> None:
+    """Wire all exception handlers onto the FastAPI app.
+
+    Also stashes the slowapi ``limiter`` on ``app.state`` so the
+    ``@limiter.limit(...)`` decorator can resolve it from request scope.
+    """
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+    app.add_exception_handler(Exception, general_exception_handler)
+    app.add_exception_handler(RateLimitExceeded, rate_limit_exception_handler)
+    app.state.limiter = limiter

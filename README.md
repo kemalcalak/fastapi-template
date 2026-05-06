@@ -16,8 +16,10 @@ While FastAPI is incredibly fast and flexible, it doesn't enforce a specific pro
 
 ## 🔗 Frontend Compatibility
 
-This backend template is designed to seamlessly integrate with the companion **React + TypeScript + Vite Enterprise Template**.
-You can find the frontend template here: [kemalcalak/React-Template](https://github.com/kemalcalak/React-Template).
+This backend template is designed to seamlessly integrate with the companion **Next.js 16 + React 19 + TypeScript Enterprise Template**.
+You can find the frontend template here: [kemalcalak/NextJS-Template](https://github.com/kemalcalak/NextJS-Template).
+
+The two templates share the same auth contract: HttpOnly `access_token` / `refresh_token` cookies, `/api/v1` prefix, `X-Requested-With` CSRF header, and a uniform `{ success, data, message, error }` response envelope.
 
 ---
 
@@ -26,16 +28,20 @@ You can find the frontend template here: [kemalcalak/React-Template](https://git
 This template integrates the best-in-class Python ecosystem tools to provide a seamless developer experience:
 
 - **Framework:** [FastAPI](https://fastapi.tiangolo.com/) for building APIs with Python 3.12+ based on standard Python type hints.
-- **Architecture:** Strict Layered Architecture separating routers, services, repositories, and models, fully utilizing FastAPI's dependency injection.
+- **Architecture:** Strict Layered Architecture separating routers, services, repositories, use cases, and models, fully utilizing FastAPI's dependency injection.
 - **Database & ORM:** [SQLAlchemy 2.0](https://www.sqlalchemy.org/) with `asyncpg` for non-blocking operations, and [Alembic](https://alembic.sqlalchemy.org/) for schema migrations.
 - **Observability & Error Tracking:** [Sentry](https://sentry.io/) built-in integration for tracking unhandled exceptions and performance tracing.
 - **Caching:** [Redis](https://redis.io/) integration using `redis.asyncio` for robust, high-performance distributed caching.
 - **Validation & Config:** [Pydantic v2](https://docs.pydantic.dev/latest/) and `pydantic-settings` for robust data validation and environment management.
-- **Security & Auth:** Built-in JWT validation, `bcrypt` password hashing, and [Slowapi](https://slowapi.readthedocs.io/en/latest/) for rate limiting and brute force protection.
+- **Security & Auth:** JWT access/refresh tokens accepted via either HttpOnly cookies *or* `Authorization: Bearer`, `bcrypt` password hashing, **Redis-backed token blacklist** (logout invalidation), strict origin-check middleware (returns 404 for foreign origins), and [Slowapi](https://slowapi.readthedocs.io/en/latest/) rate limiting for brute-force protection.
+- **Account Lifecycle:** Email verification, password reset, password change, and **soft-delete with grace period** — accounts marked for deletion can be reactivated until the cron worker purges them.
+- **Background Jobs:** [arq](https://arq-docs.helpmanual.io/) worker (separate container in compose) runs cron jobs such as `delete_expired_accounts` at the configured time.
+- **Audit Trail:** `user_activity` table records auth events and CRUD actions with IP / user agent. The `audit_unexpected_failure` decorator captures unexpected route failures.
 - **Smart Email Validation & Delivery:** Built-in asynchronous email sending with SMTP, domain MX record checking using `dnspython`, and auto-updating disposable email provider filtering via Redis cache.
 - **Standardized API Responses:** Global exception handlers standardizing success/error schemas, utilizing a centralized `messages` module (`app/core/messages/`) to prevent hardcoded responses.
+- **First Superuser Seed:** On startup, an initial admin is created from `FIRST_SUPERUSER` / `FIRST_SUPERUSER_PASSWORD` if none exists.
 - **Tooling:** [uv](https://docs.astral.sh/uv/) for blazing-fast package management, and [Ruff](https://docs.astral.sh/ruff/) for linting and formatting.
-- **Testing:** Comprehensive async testing setup with `pytest` and `pytest-asyncio`.
+- **Testing:** Comprehensive async testing setup with `pytest` and `pytest-asyncio`, in-memory SQLite via `aiosqlite`, `fakeredis`, and autouse SMTP/MX patches — tests never hit Postgres or the network.
 
 ---
 
@@ -104,17 +110,26 @@ SMTP_USE_SSL=False
 SMTP_USER="smtp_username"
 SMTP_PASSWORD="smtp_password"
 EMAILS_FROM_EMAIL="noreply@example.com"
+
+# Sentry (only initialized when ENVIRONMENT != "local")
+SENTRY_DSN=
 ```
 
 ### 3. Start the Application via Docker
 
-This project provides a `docker-compose.yaml` to spin up the entire stack, including the backend service, a local PostgreSQL instance, and a Redis container:
+This project provides a `docker-compose.yaml` to spin up the entire stack, including the backend service, a local PostgreSQL instance, a Redis container, and the **arq background worker**:
 
 ```bash
 docker-compose up -d --build
 ```
 
 The API will be available at `http://localhost:8000`. You can test the endpoints via the Swagger UI available at `http://localhost:8000/docs`.
+
+To run the worker manually (e.g. when developing the API on the host):
+
+```bash
+uv run arq app.worker.settings.WorkerSettings
+```
 
 ### 4. Run Migrations
 
@@ -154,28 +169,113 @@ This project uses [Ruff](https://docs.astral.sh/ruff/) for both code linting and
 - **Format code:** `uv run ruff format .`
 - **Auto-fix lint issues:** `uv run ruff check --fix .`
 
+### Git Hooks (pre-commit)
+
+The repo ships a `.pre-commit-config.yaml`. After cloning, install both hook stages once:
+
+```bash
+uv run pre-commit install --hook-type pre-commit --hook-type pre-push
+```
+
+**`pre-commit`** (~5–15 s) — runs on every `git commit` against staged files:
+
+- `trim trailing whitespace`, `end-of-file-fixer`, `check-yaml`, `check-toml`, `check-added-large-files`, `check-merge-conflict`, `detect-private-key`
+- `ruff check --fix` (auto-fix lint)
+- `ruff format`
+
+**`pre-push`** (~30–60 s) — runs on every `git push`:
+
+- `uv run pytest` — full test suite must pass before code leaves the machine.
+
+To run all hooks manually against the whole repo: `uv run pre-commit run --all-files`.
+
+### Metrics (Prometheus)
+
+`prometheus-fastapi-instrumentator` collects metrics for every handled request. The `/metrics` endpoint (root path, **outside `/api/v1`**, hidden from Swagger) exposes them in the standard Prometheus exposition format. Default metrics: request count, latency histograms, in-progress requests, exceptions per handler, plus the standard Python runtime + process metrics. Health endpoints and `/metrics` itself are excluded from instrumentation to avoid noise.
+
+**Auth model — three layers:**
+
+1. **`include_in_schema=False`** — the endpoint is invisible in Swagger / OpenAPI.
+2. **Environment-gated bearer token** — outside `ENVIRONMENT="local"`, the endpoint requires `Authorization: Bearer ${METRICS_TOKEN}`. Mismatched or missing tokens return **404** (not 401/403) so the endpoint's existence is not disclosed.
+3. **`origin_check_middleware`** — browser cross-origin requests with a foreign `Origin` header are rejected by the global middleware, regardless of the token.
+
+**Local dev — open access:**
+
+```bash
+curl http://localhost:8000/metrics
+```
+
+**Production / staging — bearer token required:**
+
+```bash
+# .env (or your secret store)
+METRICS_TOKEN=$(openssl rand -hex 32)
+
+# Prometheus scrape config (prometheus.yml)
+scrape_configs:
+  - job_name: fastapi
+    authorization:
+      type: Bearer
+      credentials: <your METRICS_TOKEN>
+    static_configs:
+      - targets: ['api.example.com:8000']
+```
+
+> Even with the token, prefer to also restrict `/metrics` at the reverse proxy (Prometheus scraper IP allowlist or VPC-internal-only exposure). Defense-in-depth — the token is one layer, network policy is another.
+
+### Tracing (OpenTelemetry)
+
+Metrics tell you *what* is slow ("p99 latency on `/users/{id}` doubled at 14:02"). Traces tell you *why* — a single request's full waterfall: route handler → SQLAlchemy queries → Redis calls → outbound httpx requests, each with its own span and timing.
+
+**Opt-in by design.** When `OTEL_EXPORTER_OTLP_ENDPOINT` is unset, `init_telemetry()` returns early and there is **zero overhead** — no spans created, no exporter started, no extra allocations. Local dev and the test suite stay clean.
+
+**Wiring (`app/core/telemetry.py`):**
+
+| Layer | Instrumentation | What you get |
+| --- | --- | --- |
+| FastAPI | `FastAPIInstrumentor` | Per-request span named after the route template (`/users/{id}`, not `/users/42`); `/metrics` and `/health` excluded |
+| SQLAlchemy | `SQLAlchemyInstrumentor` | One span per query, with the SQL statement and duration |
+| Redis | `RedisInstrumentor` | One span per Redis call (cache hits, rate-limit checks, pub/sub) |
+| httpx | `HTTPXClientInstrumentor` | Outbound HTTP spans (e.g. disposable-email blocklist refresh) |
+
+**Enabling traces:** point `OTEL_EXPORTER_OTLP_ENDPOINT` at any OTLP/HTTP collector — Tempo, Jaeger, Honeycomb, the OTel Collector, etc.
+
+```bash
+# .env
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+OTEL_SERVICE_NAME=fastapi-template
+```
+
+The SDK reads every other `OTEL_*` variable natively (sampler, headers, batch size, etc.) — see the [OTel SDK environment variables reference](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/) for the full list.
+
 ---
 
 ## 📂 Project Structure
 
 ```bash
 ├── app/
-│   ├── alembic/          # Database migration configurations
-│   ├── api/              # API Layer: FastAPI routers and route handlers
-│   ├── core/             # Core configurations, security, exceptions, logging
-│   ├── models/           # Domain Layer: SQLAlchemy definitions
-│   ├── repositories/     # Data Layer: Database operations and queries
-│   ├── schemas/          # API Layer: Pydantic request/response schemas
-│   ├── services/         # Business Logic Layer: Core use cases and orchestration
-│   ├── tests/            # Test suite (integration and unit tests)
-│   ├── utils/            # Helper functions and shared utilities
-│   └── main.py           # Application entry point
+│   ├── alembic/          # Alembic env + versions/ (generated migration scripts)
+│   ├── api/              # API Layer: routers, deps.py, exception handlers, decorators
+│   │   └── routes/
+│   │       ├── auth.py, users.py, health.py
+│   │       └── admin/    # Admin surface (gated by CurrentSuperUser)
+│   ├── core/             # config, db, security, redis, rate_limit, email, messages/
+│   ├── models/           # Domain Layer: SQLAlchemy ORM (User, UserActivity, …)
+│   ├── repositories/     # Data Layer: async DB queries (no business rules)
+│   ├── schemas/          # Pydantic v2 DTOs (Create / Update / Response per domain)
+│   ├── services/         # Business Logic Layer: pure async functions, take AsyncSession
+│   ├── use_cases/        # Cross-domain orchestration (e.g. activity logging)
+│   ├── worker/           # arq worker — settings + cron jobs (e.g. account deletion)
+│   ├── utils/            # Helper functions (datetime, email templates)
+│   ├── tests/            # pytest suite (in-memory SQLite, fakeredis, mocked SMTP)
+│   └── main.py           # FastAPI app, lifespan, CORS + origin middleware
 ├── alembic.ini           # Alembic settings
-├── docker-compose.yaml   # Docker compose configuration (DB & Redis)
-├── Dockerfile            # Dockerfile for backend container
+├── docker-compose.yaml   # Compose stack: backend + worker + db + redis
+├── dockerfile            # Backend image (uv-based multi-stage build)
 ├── pyproject.toml        # Project dependencies and tool configurations
 ├── pytest.ini            # Pytest settings
-└── uv.lock               # Dependency lock file
+└── uv.lock               # Dependency lock file (commit alongside dep changes)
 ```
 
 ---
