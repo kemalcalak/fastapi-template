@@ -363,8 +363,6 @@ async def test_change_password_rotates_hash_and_notifies(
     async with TestingSessionLocal() as session:
         result = await session.execute(select(UserActivity))
         actions = [
-            row.details.get("action")
-            for row in result.scalars().all()
-            if row.details
+            row.details.get("action") for row in result.scalars().all() if row.details
         ]
     assert "admin_reset_user_password" in actions

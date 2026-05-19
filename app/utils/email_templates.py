@@ -120,7 +120,9 @@ def generate_password_reset_notification_email(
         subject = "Şifreniz sıfırlandı"
         greeting = "Merhaba,"
         message = "Hesabınızın şifresi sıfırlandı. Yeniden erişim için giriş sayfasındaki 'Şifremi Unuttum' bağlantısını kullanarak yeni bir şifre belirleyebilirsiniz."
-        disclaimer = "Bu işlemi beklemiyorsanız lütfen destek ile derhal iletişime geçin."
+        disclaimer = (
+            "Bu işlemi beklemiyorsanız lütfen destek ile derhal iletişime geçin."
+        )
         footer_text = f"&copy; {project_name}. Tüm hakları saklıdır."
         plain_text = (
             "Hesabınızın şifresi sıfırlandı. Yeniden erişim için giriş "
