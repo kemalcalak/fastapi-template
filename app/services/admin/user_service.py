@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.core.email import send_email
 from app.core.messages.error_message import ErrorMessages
 from app.core.messages.success_message import SuccessMessages
-from app.core.security import create_password_reset_token
+from app.core.security import generate_secure_random_password, get_password_hash
 from app.models.user import User
 from app.repositories.admin.user import (
     is_last_active_admin,
@@ -29,7 +29,7 @@ from app.schemas.msg import Message
 from app.schemas.user import Language, SystemRole
 from app.schemas.user_activity import ActivityType, ResourceType
 from app.use_cases.log_activity import log_activity
-from app.utils.email_templates import generate_password_reset_email
+from app.utils.email_templates import generate_password_reset_notification_email
 
 
 async def list_users_admin_service(
@@ -257,25 +257,27 @@ async def delete_user_admin_service(
     return Message(success=True, message=SuccessMessages.ADMIN_USER_DELETED)
 
 
-async def reset_password_admin_service(
+async def change_password_admin_service(
     request: Request,
     session: AsyncSession,
     current_user: User,
     user_id: uuid.UUID,
     lang: Language = Language.EN,
 ) -> Message:
-    """Trigger a password-reset email on behalf of the target user.
+    """Force-rotate the target user's password to an unknown random value.
 
-    The admin never sees or sets the new password; the user completes the reset
-    via the standard email-link flow used by self-service password recovery.
+    The new password is never returned to the caller and never displayed; the
+    target user must regain access via the standard 'Forgot Password' flow on
+    the login page. A neutral notification email is sent so the recovery path
+    stays auditable and tied to a user-initiated reset request.
     """
     target = await _load_target(session, user_id)
 
-    token = create_password_reset_token(target.email)
-    reset_url = f"{settings.FRONTEND_HOST}/reset-password?token={token}"
+    new_password = generate_secure_random_password()
+    hashed_password = get_password_hash(new_password)
+    await update_user(session, target, {"hashed_password": hashed_password})
 
-    email_data = generate_password_reset_email(
-        reset_link=reset_url,
+    email_data = generate_password_reset_notification_email(
         project_name=settings.PROJECT_NAME,
         lang=lang,
     )
@@ -294,8 +296,8 @@ async def reset_password_admin_service(
         activity_type=ActivityType.UPDATE,
         resource_type=ResourceType.AUTH,
         resource_id=target.id,
-        details={"action": "admin_triggered_password_reset"},
+        details={"action": "admin_reset_user_password"},
         request=request,
     )
 
-    return Message(success=True, message=SuccessMessages.ADMIN_PASSWORD_RESET_SENT)
+    return Message(success=True, message=SuccessMessages.ADMIN_PASSWORD_CHANGED)

@@ -17,10 +17,10 @@ from app.schemas.msg import Message
 from app.schemas.user import Language, SystemRole
 from app.schemas.user_activity import ActivityType, ResourceType
 from app.services.admin.user_service import (
+    change_password_admin_service,
     delete_user_admin_service,
     get_user_admin_service,
     list_users_admin_service,
-    reset_password_admin_service,
     suspend_user_admin_service,
     unsuspend_user_admin_service,
     update_user_admin_service,
@@ -151,26 +151,27 @@ async def delete_user(
     )
 
 
-@router.post("/{user_id}/reset-password", response_model=Message)
+@router.post("/{user_id}/change-password", response_model=Message)
 @rate_limit_strict("5/minute")
 @audit_unexpected_failure(
     activity_type=ActivityType.UPDATE,
     resource_type=ResourceType.AUTH,
-    endpoint="/admin/users/{user_id}/reset-password",
+    endpoint="/admin/users/{user_id}/change-password",
 )
-async def reset_user_password(
+async def change_user_password(
     request: Request,
     current_user: CurrentSuperUser,
     session: SessionDep,
     user_id: uuid.UUID,
     lang: Language = Language.EN,
 ) -> Message:
-    """Send a password-reset email to the target user.
+    """Force-rotate the target user's password to an unknown random value.
 
-    The admin never sees or sets the password — the user completes the reset
-    via the standard email-link flow.
+    The new password is never returned. The target user receives a neutral
+    notification email and must regain access via the standard 'Forgot
+    Password' flow on the login page.
     """
-    return await reset_password_admin_service(
+    return await change_password_admin_service(
         request=request,
         session=session,
         current_user=current_user,
