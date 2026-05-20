@@ -22,4 +22,4 @@ class SuccessMessages:
     ADMIN_USER_SUSPENDED = "success.admin.user_suspended"
     ADMIN_USER_UNSUSPENDED = "success.admin.user_unsuspended"
     ADMIN_USER_DELETED = "success.admin.user_deleted"
-    ADMIN_PASSWORD_RESET_SENT = "success.admin.password_reset_sent"
+    ADMIN_PASSWORD_CHANGED = "success.admin.password_changed"
