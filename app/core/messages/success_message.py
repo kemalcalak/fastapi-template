@@ -26,3 +26,4 @@ class SuccessMessages:
 
     # File / upload
     FILE_UPLOADED = "success.file.uploaded"
+    ADMIN_FILE_DELETED = "success.admin.file_deleted"
