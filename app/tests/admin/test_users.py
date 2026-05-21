@@ -14,6 +14,7 @@ from app.models.user import User
 from app.schemas.user import SystemRole
 from app.tests.admin.conftest import (
     get_user_id,
+    login,
     promote_to_admin,
     register_and_verify,
 )
@@ -75,6 +76,60 @@ async def test_get_user_not_found(admin_client: AsyncClient):
         "/admin/users/00000000-0000-0000-0000-000000000000"
     )
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_admin_user_views_include_avatar(admin_client: AsyncClient):
+    """A user's avatar surfaces in both the admin list and detail views."""
+    png = b"\x89PNG\r\n\x1a\nfake-image-bytes"
+    file_id = (
+        await admin_client.post("/upload", files={"file": ("a.png", png, "image/png")})
+    ).json()["id"]
+    await admin_client.patch("/users/me", json={"avatar_file_id": file_id})
+
+    listing = await admin_client.get("/admin/users?search=admin@test.com")
+    admin_row = next(
+        u for u in listing.json()["data"] if u["email"] == "admin@test.com"
+    )
+    assert admin_row["avatar_file"]["id"] == file_id
+    assert admin_row["avatar_file"]["url"] == "https://cdn.test/img.png"
+
+    admin_id = await get_user_id("admin@test.com")
+    detail = await admin_client.get(f"/admin/users/{admin_id}")
+    assert detail.json()["avatar_file"]["id"] == file_id
+
+    await register_and_verify(admin_client, "noavatar@test.com")
+    other_id = await get_user_id("noavatar@test.com")
+    other = await admin_client.get(f"/admin/users/{other_id}")
+    assert other.json()["avatar_file"] is None
+
+
+@pytest.mark.asyncio
+async def test_regular_user_avatar_visible_to_admin(client: AsyncClient):
+    """An avatar set by a regular user surfaces in the admin list and detail."""
+    png = b"\x89PNG\r\n\x1a\nfake-image-bytes"
+
+    # A regular user uploads and attaches their own avatar.
+    await register_and_verify(client, "member@test.com")
+    await login(client, "member@test.com")
+    file_id = (
+        await client.post("/upload", files={"file": ("a.png", png, "image/png")})
+    ).json()["id"]
+    await client.patch("/users/me", json={"avatar_file_id": file_id})
+    member_id = await get_user_id("member@test.com")
+
+    # An admin then views the user list and detail.
+    await register_and_verify(client, "admin@test.com")
+    await promote_to_admin("admin@test.com")
+    await login(client, "admin@test.com")
+
+    listing = await client.get("/admin/users?search=member@test.com")
+    row = next(u for u in listing.json()["data"] if u["email"] == "member@test.com")
+    assert row["avatar_file"]["id"] == file_id
+    assert row["avatar_file"]["url"] == "https://cdn.test/img.png"
+
+    detail = await client.get(f"/admin/users/{member_id}")
+    assert detail.json()["avatar_file"]["id"] == file_id
 
 
 @pytest.mark.asyncio
