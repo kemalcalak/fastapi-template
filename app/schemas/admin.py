@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.schemas.common import ActivityDetails
+from app.schemas.file import FilePublic
 from app.schemas.user import SystemRole
 from app.schemas.user_activity import ActivityStatus, ActivityType, ResourceType
 
@@ -45,6 +46,7 @@ class AdminUserListItem(BaseModel):
     deactivated_at: datetime | None = None
     deletion_scheduled_at: datetime | None = None
     suspended_at: datetime | None = None
+    avatar_file: FilePublic | None = None
 
 
 class AdminUserListResponse(BaseModel):
