@@ -94,8 +94,10 @@ class User(Base):
         passive_deletes=True,
     )
 
-    # Avatar points at one File via the local avatar_file_id FK.
+    # Avatar points at one File via the local avatar_file_id FK. selectin so
+    # it loads (batched) on every User load — safe to serialize in async.
     avatar_file: Mapped["File | None"] = relationship(
         "File",
         foreign_keys=[avatar_file_id],
+        lazy="selectin",
     )
